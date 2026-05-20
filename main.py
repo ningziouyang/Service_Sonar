@@ -1,5 +1,5 @@
 # =====================================================================
-# main.py - Backend-Skelett für das Multi-Agenten-System
+# main.py - Backend-Skelett für das Supervisor-Multi-Agenten-System
 # Architektonischer Ansatz: Cloud-basierte Hybrid-LLM-Infrastruktur
 # =====================================================================
 
@@ -243,13 +243,13 @@ def supervisor_agent():
     
     # 1. Infrastruktur & Datenerfassung
     init_db()
-    agent_data_fetcher()     # Schritt 1: Datensammlung (Ergibt status=0)
+    agent_data_fetcher()     # Schritt 1: Extraktion (Ergibt status=0)
     
     # 2. KI-Erstprüfung & HITL-Filterung
     agent_groq_cleaner()     # Schritt 2: Groq Filter (Ergibt status=1, status=-1 ODER status=3)
     
     # =================================================================
-    # INTERVENTION: Hier übernimmt der Mensch die Kontrolle über die Datenbank
+    # INTERVENTION: Hier übernimmt der Mensch die Kontrolle über die DB!
     # =================================================================
     human_intervention_interface()
     
