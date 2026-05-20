@@ -163,22 +163,88 @@ def agent_gpt_analyzer():
 
 def agent_report_generator():
     """
-    Agent 4: Aggregation & Berichterstattung.
-    Konsolidiert alle Datensätze mit Status=2 und generiert das Abschlussdokument.
+    Agent 4: Aggregation & Berichterstattung (Generativer Innovations-Agent).
+    Task: Konsolidiert alle Datensätze mit Status=2 und generiert das Abschlussdokument.
+          Nutzt Llama 3.3 (70B) via Groq für die wiss. Synthese und Innovationsgenerierung.
     """
-    print("[Agent 4] Aggregiere verifizierte Analyseergebnisse (status=2) aus der Datenbank...")
+    print("\n---------------------------------------------------------------------")
+    print("[Agent 4] Aggregiere verifizierte Ergebnisse (status=2) aus der Datenbank...")
+    print("---------------------------------------------------------------------")
+    
     conn = sqlite3.connect(DB_FILE)
     cursor = conn.cursor()
 
+    # Nur Daten abfragen, die von Agent 3 fertig analysiert und strukturiert wurden (status=2)
     cursor.execute("SELECT id, cleaned_content, analysis_json FROM forum_posts WHERE status = 2")
     records = cursor.fetchall()
 
-    if records:
-        print(f"[Agent 4] Generiere finalen akademischen Evaluierungsbericht im Markdown-Format...")
-        # Datei-Export-Logik ...
-    else:
-        print("[Agent 4] Keine finalisierten Daten (status=2) für Bericht verfügbar.")
+    if not records:
+        print("[Agent 4 INFO] Keine ausreichend analysierten Daten (status=2) für die Innovationsgenerierung vorhanden.")
+        conn.close()
+        return
+
+    # Forschungsdaten für den Kontext des Modells bündeln
+    forschungskontext = ""
+    for db_id, cleaned_text, json_str in records:
+        forschungskontext += f"--- DATENSATZ HARTE FAKTEN ID {db_id} ---\n"
+        forschungskontext += f"Empirischer Text: {cleaned_text}\n"
+        forschungskontext += f"Strukturierte KI-Analyse: {json_str}\n\n"
+
+    report_filename = "Service_Sonar_Innovationsbericht.md"
+
+    if SIMULATION_MODE:
+        # --- ACADEMIC SIMULATION MODE ---
+        print(f"[Agent 4 SIMULATION] Erzeuge reinen Open-Source-Berichtsentwurf auf Basis von {len(records)} Fallbeispielen...")
+        bericht_inhalt = (
+            f"# Abschlussbericht: Service Sonar (Simulation - Reine Open-Source-Route)\n\n"
+            f"HINWEIS: Im API-Modus wird dieser Text durch eine generative Inferenz von Llama 3.3 (70B) ersetzt.\n\n"
+            f"## Aggregierte Datenbasis:\n{forschungskontext}"
+        )
+        with open(report_filename, "w", encoding="utf-8") as file:
+            file.write(bericht_inhalt)
+        print(f"[Agent 4 SUCCESS] Simulations-Bericht '[ {report_filename} ]' erfolgreich gespeichert.")
         
+    else:
+        # --- LIVE API-ROUTE (Groq Llama 3.3 70B - Innovationsfokus) ---
+        print("[Agent 4] Rufe Llama 3.3 (70B) via Groq auf für den kreativen Denkprozess...")
+        try:
+            # Fest verankerte akademische Struktur für maximale Innovationskraft
+            system_prompt = """
+            Du bist ein renommierter Professor für Sozialwissenschaften und Innovationsmanagement an einer deutschen Universität.
+            Deine Aufgabe ist es, basierend auf den quantitativen Daten von Agent 3 einen hochgradig innovativen Forschungsbericht zu schreiben.
+
+            Der Bericht MUSS im Markdown-Format verfasst sein und zwingend folgende akademische Struktur aufweisen:
+            1. Executive Summary
+            2. Aggregierte Analyse der studentischen Versorgungslücken (Clustering nach Problemfeldern)
+            3. INNOVATIVE LÖSUNGSANSÄTZE (Der wichtigste Teil):
+               - Entwickle mindestens 3 konkrete, technologiegestützte oder sozial-innovative Konzepte, die diese Lücken schließen können (z.B. plattformbasierte Ansätze, Peer-to-Peer-Modelle oder Reformvorschläge).
+               - Jede Lösung muss eine 'Machbarkeitsanalyse' (Feasibility) und den 'erwarteten Impact' enthalten.
+            4. Kritische Würdigung & Ausblick
+
+            Schreibe in einem anspruchsvollen, präzisen wissenschaftlichen Fließtext auf Deutsch. Vermeide reine, kontextlose Aufzählungen.
+            """
+            
+            user_prompt = f"Hier sind die empirischen Daten aus unserer Datenbank. Generiere daraus die innovativen Lösungsansätze:\n\n{forschungskontext}"
+            
+            response = client_groq.chat.completions.create(
+                model="llama-3.3-70b-specdec",
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_prompt}
+                ],
+                temperature=0.7  # Erhöhte Kreativität für innovativere Ansätze
+            )
+            
+            innovations_bericht = response.choices[0].message.content
+            
+            with open(report_filename, "w", encoding="utf-8") as file:
+                file.write(innovations_bericht)
+                
+            print(f"[Agent 4 SUCCESS] Der Abschlussbericht mit innovativen Lösungen wurde kostenfrei über Groq generiert!")
+            
+        except Exception as e:
+            print(f"[Agent 4 Fehler] Open-Source Innovations-Generierung fehlgeschlagen: {e}")
+            
     conn.close()
 
 
