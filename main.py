@@ -1,128 +1,100 @@
-# =====================================================================
-# main.py - Backend-Skelett für das Supervisor-Multi-Agenten-System
-# Architektonischer Ansatz: Cloud-basierte Hybrid-LLM-Infrastruktur
-# =====================================================================
-
-import os
+import sqlite3
+import json
 from openai import OpenAI
 
 # =====================================================================
-# ---- 0. GLOBALE KONFIGURATION: CLOUD-LLM-ROUTING (API-MANAGEMENT) ----
+# ---- 0. INFRASTRUKTUR-KONFIGURATION (REIN OPEN-SOURCE VIA GROQ) ----
 # =====================================================================
 
-# ROUTE A: Open-Source-Infrastruktur via GroqCloud
-# Verantwortlich für hochfrequente Datenbereinigung & Textzusammenfassung (Kostenlose Tier-Nutzung).
 GROQ_API_KEY = "gsk_xxxx_Hier_deinen_Groq_Key_einfügen"
 client_groq = OpenAI(
     base_url="https://api.groq.com/openai/v1",
     api_key=GROQ_API_KEY
 )
 
-# ROUTE B: Proprietary-Model-Infrastruktur via OpenAI
-# Verantwortlich für komplexe semantische Analysen & deterministische JSON-Strukturen.
-OPENAI_API_KEY = "sk-proj-xxxx_Hier_deinen_OpenAI_Key_einfügen"
-client_openai = OpenAI(
-    api_key=OPENAI_API_KEY
-)
+DB_FILE = "service_sonar.db"
 
 
 # =====================================================================
-# ---- 1. DEFINITIONEN DER 4 WORKER-AGENTEN ----
+# ---- 🌟 AGENT 4: GENERATIVER INNOVATIONS-AGENT ----
 # =====================================================================
-
-def agent_data_fetcher():
-    """
-    Agent 1: Forum-Scraper & Datensammlung.
-    Sammelt Rohdaten aus studentischen Foren und initialisiert Status=0.
-    """
-    print("[Agent 1] Extrahiere studentische Rohdaten aus Webquellen...")
-    # TODO: Implementierung des Scraping-Algorithmus & SQL-INSERT (status=0)
-    pass
-
-
-def agent_groq_cleaner():
-    """
-    Agent 2: Textbereinigung & Reduktion (Open-Source LLM).
-    Nutzt Llama 3.2 via GroqCloud für eine extrem schnelle Massenverarbeitung bei Null-Kosten.
-    Updates auf Status=1.
-    """
-    print("[Agent 2] Rufe Open-Source-Modell (Llama 3.2) via Groq-API auf...")
-    print("[Agent 2] Bereinige Rauschen, korrigiere Syntax und generiere Core-Absätze...")
-    
-    # try:
-    #     response = client_groq.chat.completions.create(
-    #         model="llama3-8b-8192", # Alternativ: "llama-3.2-3b-preview"
-    #         messages=[{"role": "user", "content": "Säubere und übersetze folgenden Foren-Post..."}]
-    #     )
-    #     zusammenfassung = response.choices[0].message.content
-    #     # Danach: SQL-UPDATE auf status=1
-    # except Exception as e:
-    #     print(f"[Agent 2 Fehler] Cloud-Inferenz fehlgeschlagen: {e}")
-
-    #Relevanzprüfung
-    #Anonymisierung
-    #Strukturierung
-    pass
-
-
-def agent_gpt_analyzer():
-    """
-    Agent 3: Qualitative Tiefenanalyse (LLM-Model).
-    Nutzt GPT-4o für die präzise Identifikation von sozialen Versorgungslücken.
-    Ergibt strukturierte Datenkomponenten. Updates auf Status=2.
-    """
-    print("[Agent 3] Rufe Closed-Source-Modell (GPT-4o) via OpenAI-API auf...")
-    print("[Agent 3] Analysiere systemische Defizite im Bereich der studentischen Versorgung...")
-    
-    # Komplexe logische Evaluierung mit erzwungenem JSON-Output:
-    # try:
-    #     response = client_openai.chat.completions.create(
-    #         model="gpt-4o",
-    #         response_format={ "type": "json_object" }, # Gewährleistet valide JSON-Strukturen für die DB
-    #         messages=[{"role": "user", "content": "Analysiere Versorgungslücken im Text..."}]
-    #     )
-    #     # Danach: SQL-UPDATE auf status=2
-    # except Exception as e:
-    #     print(f"[Agent 3 Fehler] OpenAI-Inferenz fehlgeschlagen: {e}")
-    
-    pass
-
-
 def agent_report_generator():
     """
-    Agent 4: Aggregation & Berichterstattung.
-    Konsolidiert alle Datensätze mit Status=2 und generiert das finale akademische Dokument.
+    Agent 4: Aggregation & Generierung innovativer Lösungsansätze.
+    Zuständigkeit: Teammitglied B
+    Task: Liest alle quantitativen Analyseergebnisse (status=2) aus, nutzt Llama 3.3 (70B)
+          für die cross-analytische Synthese und generiert konkrete, innovative Konzepte.
     """
-    print("[Agent 4] Aggregiere verifizierte Analyseergebnisse aus der Datenbank...")
-    print("[Agent 4] Generiere finalen akademischen Evaluierungsbericht im Markdown-Format (.md)...")
-    # TODO: Datei-Export und Formatierung der Ergebnisse für die Seminararbeit
-    pass
-
-
-# =====================================================================
-# ---- 2. ZENTRALE ORCHESTRIERUNG: SUPERVISOR AGENT ----
-# =====================================================================
-
-def supervisor_agent():
-    """
-    Supervisor: Der primäre Orchestrator (Zentrales Kontrollzentrum).
-    Überwacht den Systemstatus der SQLite-Datenbank und delegiert Aufgaben sequentiell.
-    """
-    print("\n=====================================================================")
-    print("--- [Supervisor] Haupt-Agent gestartet: Initiiere System-Scan ---")
-    print("=====================================================================")
+    print("[Agent 4] Aggregiere verifizierte Ergebnisse (status=2) für die Innovations-Synthese...")
     
-    # Der Supervisor steuert den gesamten Datenfluss basierend auf dem Zustandsmodell:
-    agent_data_fetcher()     # Schritt 1: Python-Skript (Status 0)
-    agent_groq_cleaner()     # Schritt 2: Cloud-Open-Source-Inferenz (Status 1)
-    agent_gpt_analyzer()     # Schritt 3: Cloud-Closed-Source-Inferenz (Status 2)
-    agent_report_generator()  # Schritt 4: Finaler Berichtsexport
+    # 1. Verbindung zur Datenbank
+    conn = sqlite3.connect(DB_FILE)
+    cursor = conn.cursor()
     
-    print("\n=====================================================================")
-    print("--- [Supervisor] Alle Agenten-Phasen erfolgreich durchlaufen. ---")
-    print("=====================================================================\n")
+    # 2. Nur Daten abfragen, die von Agent 3 fertig analysiert und strukturiert wurden (status=2)
+    cursor.execute("SELECT id, cleaned_content, analysis_json FROM forum_posts WHERE status = 2")
+    records = cursor.fetchall()
+    
+    if not records:
+        print("[Agent 4 INFO] Keine ausreichend analysierten Daten (status=2) für die Innovationsgenerierung vorhanden.")
+        conn.close()
+        return
 
+    # 3. Forschungsdaten für den Kontext des Modells bündeln
+    forschungskontext = ""
+    for db_id, cleaned_text, json_str in records:
+        forschungskontext += f"--- DATENSATZ HARTE FAKTEN ID {db_id} ---\n"
+        forschungskontext += f"Empirischer Text: {cleaned_text}\n"
+        forschungskontext += f"Strukturierte KI-Analyse: {json_str}\n\n"
+
+    # 4. Groq-API Aufruf mit starker Innovations-Direktive im System Prompt
+    print("[Agent 4] Rufe Llama 3.3 (70B) via Groq auf für den kreativen Denkprozess...")
+    try:
+        # Fest verankerte akademische Struktur für maximale Innovationskraft
+        system_prompt = """
+        Du bist ein renommierter Professor für Sozialwissenschaften und Innovationsmanagement an einer deutschen Universität.
+        Deine Aufgabe ist es, basierend auf den quantitativen Daten von Agent 3 einen hochgradig innovativen Forschungsbericht zu schreiben.
+
+        Der Bericht MUSS im Markdown-Format verfasst sein und zwingend folgende akademische Struktur aufweisen:
+        1. Executive Summary
+        2. Aggregierte Analyse der studentischen Versorgungslücken (Clustering nach Problemfeldern)
+        3. 🌟 INNOVATIVE LÖSUNGSANSÄTZE (Der wichtigste Teil):
+           - Entwickle mindestens 3 konkrete, technologiegestützte oder sozial-innovative Konzepte, die diese Lücken schließen können (z.B. plattformbasierte Ansätze, Peer-to-Peer-Modelle oder Reformvorschläge).
+           - Jede Lösung muss eine 'Machbarkeitsanalyse' (Feasibility) und den 'erwarteten Impact' enthalten.
+        4. Kritische Würdigung & Ausblick
+
+        Schreibe in einem anspruchsvollen, präzisen wissenschaftlichen Fließtext auf Deutsch. Vermeide reine, kontextlose Aufzählungen.
+        """
+        
+        user_prompt = f"Hier sind die empirischen Daten aus unserer Datenbank. Generiere daraus die innovativen Lösungsansätze:\n\n{forschungskontext}"
+        
+        # Inferenz über das extrem leistungsstarke Llama 3.3 70B Modell
+        response = client_groq.chat.completions.create(
+            model="llama-3.3-70b-specdec",
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt}
+            ],
+            temperature=0.7 # Leicht erhöhte Kreativität für innovativere Ansätze
+        )
+        
+        innovations_bericht = response.choices[0].message.content
+        
+        # 5. Den von der KI generierten Innovationsbericht als .md Datei auf die Festplatte schreiben
+        report_filename = "Service_Sonar_Innovationsbericht.md"
+        with open(report_filename, "w", encoding="utf-8") as file:
+            file.write(innovations_bericht)
+            
+        print("\n=====================================================================")
+        print(f"🎉 🎉 SUCCESS: Innovationsbericht erfolgreich generiert! 🎉 🎉")
+        print(f"-> Datei gespeichert unter: [ {report_filename} ]")
+        print("=====================================================================\n")
+        
+    except Exception as e:
+        print(f"[Agent 4 Fehler] Open-Source Innovations-Generierung fehlgeschlagen: {e}")
+        
+    finally:
+        conn.close()
 
 if __name__ == "__main__":
-    # Datenbankprüfung und Systemstart
-    supervisor_agent()
+    agent_report_generator()
