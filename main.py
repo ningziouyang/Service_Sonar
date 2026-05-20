@@ -14,7 +14,7 @@ from openai import OpenAI
 # Verantwortlich für hochfrequente Datenbereinigung & Textzusammenfassung (Kostenlose Tier-Nutzung).
 GROQ_API_KEY = "gsk_xxxx_Hier_deinen_Groq_Key_einfügen"
 client_groq = OpenAI(
-    base_url=" ",
+    base_url="https://api.groq.com/openai/v1",
     api_key=GROQ_API_KEY
 )
 
