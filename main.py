@@ -32,8 +32,8 @@ client_openai = OpenAI(
 
 def agent_data_fetcher():
     """
-    Agent 1: Forum-Scraper & Datenakquisition.
-    Sammelt Rohdaten aus studentischen Foren (Reddit, ILIAS) und initialisiert Status=0.
+    Agent 1: Forum-Scraper & Datensammlung.
+    Sammelt Rohdaten aus studentischen Foren und initialisiert Status=0.
     """
     print("[Agent 1] Extrahiere studentische Rohdaten aus Webquellen...")
     # TODO: Implementierung des Scraping-Algorithmus & SQL-INSERT (status=0)
@@ -58,13 +58,16 @@ def agent_groq_cleaner():
     #     # Danach: SQL-UPDATE auf status=1
     # except Exception as e:
     #     print(f"[Agent 2 Fehler] Cloud-Inferenz fehlgeschlagen: {e}")
-    
+
+    #Relevanzprüfung
+    #Anonymisierung
+    #Strukturierung
     pass
 
 
 def agent_gpt_analyzer():
     """
-    Agent 3: Qualitative Tiefenanalyse (Closed-Source LLM).
+    Agent 3: Qualitative Tiefenanalyse (LLM-Model).
     Nutzt GPT-4o für die präzise Identifikation von sozialen Versorgungslücken.
     Ergibt strukturierte Datenkomponenten. Updates auf Status=2.
     """
