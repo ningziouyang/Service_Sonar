@@ -29,7 +29,7 @@ def fetch_forum_data():
     Agent 1: Extrahiert studentische Rohdaten aus Foren (Studis Online).
     Schreibt neue Einträge mit status=0 (Raw) in die Datenbank.
     """
-    print("🚀 [Agent 1] Starte Web-Scraper für Studis Online...\n")
+    print("[Agent 1] Starte Web-Scraper für Studis Online...\n")
     
     # Verbindung zur State-Machine-Datenbank herstellen
     conn = sqlite3.connect(DB_FILE)
@@ -39,7 +39,7 @@ def fetch_forum_data():
 
     # Iteriere über jede konfigurierte Kategorie
     for category, section_url in FORUM_SECTIONS.items():
-        print(f"📂 Scrape Kategorie: {category} -> {section_url}")
+        print(f"Scrape Kategorie: {category} -> {section_url}")
         
         try:
             # 1. HTTP-GET-Anfrage an die Forenseite senden
@@ -77,11 +77,11 @@ def fetch_forum_data():
                     """, (post_url, raw_text))
                     
                     if cursor.rowcount > 0:
-                        print(f"   ✅ Neu importiert: {raw_text[:50]}...")
+                        print(f"Neu importiert: {raw_text[:50]}...")
                         total_inserted += 1
                         
                 except sqlite3.Error as db_err:
-                    print(f"   ❌ Datenbank-Fehler: {db_err}")
+                    print(f"Datenbank-Fehler: {db_err}")
                 
             # 3. Höfliche Pause (Polite Delay) einlegen, um einen IP-Bann zu verhindern
             sleep_time = random.uniform(2.0, 4.0)
@@ -89,7 +89,7 @@ def fetch_forum_data():
             time.sleep(sleep_time)
             
         except Exception as e:
-            print(f"❌ Netzwerk- oder Parsing-Fehler bei Kategorie '{category}': {e}")
+            print(f"Netzwerk- oder Parsing-Fehler bei Kategorie '{category}': {e}")
 
     # Transaktion bestätigen und Verbindung schließen
     conn.commit()
@@ -99,7 +99,7 @@ def fetch_forum_data():
 
 
 if __name__ == "__main__":
-    print("🛠️ [System] Prüfe/Erstelle Datenbank-Tabellen...")
+    print("[System] Prüfe/Erstelle Datenbank-Tabellen...")
     setup_conn = sqlite3.connect(DB_FILE)
     setup_conn.execute("""
         CREATE TABLE IF NOT EXISTS forum_posts (
