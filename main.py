@@ -22,14 +22,15 @@ FORUM_SECTIONS = {
 }
 
 # =====================================================================
-# 2. KERNLOGIK DES SCRAPERS (AGENT 1)
+# 2. KERNLOGIK DES SCRAPERS (AGENT 1) - INKLUSIVE PAGINATION
 # =====================================================================
 def fetch_forum_data():
     """
     Agent 1: Extrahiert studentische Rohdaten aus Foren (Studis Online).
     Schreibt neue Einträge mit status=0 (Raw) in die Datenbank.
+    Beinhaltet automatische Pagination und eine robuste (bulletproof) Extraktionslogik.
     """
-    print("[Agent 1] Starte Web-Scraper für Studis Online...\n")
+    print("🚀 [Agent 1] Starte Web-Scraper für Studis Online...\n")
     
     # Verbindung zur State-Machine-Datenbank herstellen
     conn = sqlite3.connect(DB_FILE)
@@ -38,58 +39,80 @@ def fetch_forum_data():
     total_inserted = 0
 
     # Iteriere über jede konfigurierte Kategorie
-    for category, section_url in FORUM_SECTIONS.items():
-        print(f"Scrape Kategorie: {category} -> {section_url}")
+    for category, base_url in FORUM_SECTIONS.items():
+        print(f"\n==================================================")
+        print(f"📂 Starte Scraping für Kategorie: {category}")
+        print(f"==================================================")
         
-        try:
-            # 1. HTTP-GET-Anfrage an die Forenseite senden
-            response = requests.get(section_url, headers=HEADERS, timeout=10)
-            response.raise_for_status() # Wirft eine Exception bei 4xx/5xx HTTP-Fehlern
+        # 🌟 NEUE LOGIK: Automatisches Pagination (Blättern durch Seiten 1 bis 5)
+        # Ändere '6' auf z.B. '11', um 10 Seiten pro Kategorie abzurufen.
+        for page in range(1, 6): 
             
-            soup = BeautifulSoup(response.text, 'html.parser')
+            # 1. Dynamische URL-Generierung für die jeweilige Seite
+            if page == 1:
+                page_url = base_url
+            else:
+                # Struktur für Folgeseiten bei Studis-Online
+                page_url = f"{base_url},page={page}"
+                
+            print(f"   📄 Lese Seite {page} -> {page_url}")
             
-            # ===============================================================
-            # PRÄZISE EXTRAKTION: Basierend auf der DOM-Analyse (F12)
-            # Wählt exakt die <a> Tags, die BEIDE Klassen enthalten.
-            # ===============================================================
-            post_links = soup.select('a.ston-farblinkh.ston-la') 
-            
-            for link in post_links:
-                # Absolute URL zusammensetzen, falls sie relativ ist
-                post_url = link.get('href')
-                if not post_url.startswith('http'):
-                    post_url = "https://www.studis-online.de" + post_url
+            try:
+                # 2. HTTP-GET-Anfrage an die Forenseite senden
+                response = requests.get(page_url, headers=HEADERS, timeout=10)
+                response.raise_for_status()
                 
-                # Titel bereinigen (Leerzeichen entfernen)
-                raw_text = link.text.strip()
+                soup = BeautifulSoup(response.text, 'html.parser')
                 
-                # Rauschen reduzieren: Antwort-Präfix "Re: " für saubere KI-Analyse entfernen
-                if raw_text.startswith("Re: "):
-                    raw_text = raw_text[4:].strip()
+                # ===============================================================
+                # 🔍 BULLETPROOF EXTRAKTION: Ignoriert wechselnde CSS-Klassen!
+                # Sucht gezielt nach <a>-Tags, die "read.php" im Link enthalten.
+                # ===============================================================
+                post_links = soup.select('a[href*="read.php"]') 
                 
-                # 2. Die "Rohdaten" (Raw) mit status=0 in die DB schreiben
-                try:
-                    # INSERT OR IGNORE sorgt dank UNIQUE-Constraint auf 'url' 
-                    # automatisch für eine Deduplizierung!
-                    cursor.execute("""
-                        INSERT OR IGNORE INTO forum_posts (url, raw_content, status) 
-                        VALUES (?, ?, 0)
-                    """, (post_url, raw_text))
+                # Wenn eine Seite keine Links mehr enthält, ist das Ende des Forums erreicht
+                if not post_links:
+                    print(f"   ⚠️ Keine Posts auf Seite {page} gefunden. Breche Pagination für '{category}' ab.")
+                    break 
+                
+                for link in post_links:
+                    post_url = link.get('href')
+                    if not post_url.startswith('http'):
+                        post_url = "https://www.studis-online.de" + post_url
                     
-                    if cursor.rowcount > 0:
-                        print(f"Neu importiert: {raw_text[:50]}...")
-                        total_inserted += 1
+                    raw_text = link.text.strip()
+                    
+                    # 🚀 NEU: Filtert leere oder extrem kurze Texte heraus (z.B. Seitenzahlen "1", "2")
+                    if not raw_text or len(raw_text) < 5:
+                        continue
                         
-                except sqlite3.Error as db_err:
-                    print(f"Datenbank-Fehler: {db_err}")
+                    # Rauschen reduzieren ("Re: " abschneiden)
+                    if raw_text.startswith("Re: "):
+                        raw_text = raw_text[4:].strip()
+                    
+                    # 4. Speichern in der DB
+                    try:
+                        # Automatische Deduplizierung durch UNIQUE-Constraint auf 'url'
+                        cursor.execute("""
+                            INSERT OR IGNORE INTO forum_posts (url, raw_content, status) 
+                            VALUES (?, ?, 0)
+                        """, (post_url, raw_text))
+                        
+                        if cursor.rowcount > 0:
+                            print(f"      ✅ Neu: {raw_text[:45]}...")
+                            total_inserted += 1
+                            
+                    except sqlite3.Error:
+                        pass # Stiller Fehler bei Duplikaten (gewünschtes Verhalten)
                 
-            # 3. Höfliche Pause (Polite Delay) einlegen, um einen IP-Bann zu verhindern
-            sleep_time = random.uniform(2.0, 4.0)
-            print(f"⏳ Pausiere für {sleep_time:.2f} Sekunden (Anti-Scraping-Schutz)...\n")
-            time.sleep(sleep_time)
-            
-        except Exception as e:
-            print(f"Netzwerk- oder Parsing-Fehler bei Kategorie '{category}': {e}")
+                # 5. Höfliche Pause NACH JEDER SEITE (Extrem wichtig für Pagination!)
+                sleep_time = random.uniform(2.5, 4.5)
+                print(f"   ⏳ Pausiere für {sleep_time:.2f}s (Anti-Scraping-Schutz)...\n")
+                time.sleep(sleep_time)
+                
+            except Exception as e:
+                print(f"   ❌ Fehler auf Seite {page}: {e}")
+                break # Bei schweren Netzwerkfehlern (z.B. 404) zur nächsten Kategorie springen
 
     # Transaktion bestätigen und Verbindung schließen
     conn.commit()
@@ -98,8 +121,12 @@ def fetch_forum_data():
     print(f"\n🎉 [Agent 1] Scraping-Zyklus beendet! {total_inserted} neue Datensätze als 'status=0' gespeichert.")
 
 
+# =====================================================================
+# 3. INITIALISIERUNG & AUSFÜHRUNG
+# =====================================================================
 if __name__ == "__main__":
-    print("[System] Prüfe/Erstelle Datenbank-Tabellen...")
+    # 1. Sicherstellen, dass die Datenbank und Tabelle existieren
+    print("🛠️ [System] Prüfe/Erstelle Datenbank-Tabellen...")
     setup_conn = sqlite3.connect(DB_FILE)
     setup_conn.execute("""
         CREATE TABLE IF NOT EXISTS forum_posts (
@@ -114,4 +141,5 @@ if __name__ == "__main__":
     setup_conn.commit()
     setup_conn.close()
 
+    # 2. Scraping-Pipeline starten
     fetch_forum_data()
