@@ -83,11 +83,27 @@ class Agent3Analyzer:
 
             # 🚀 Hier rufen wir das echte KI-Modell auf!
             analysis_dict = self._call_llm_api(cleaned_content)
-            
+
+            # Wenn der API-Aufruf fehlschlägt, darf der Beitrag nicht als erfolgreich analysiert gelten.
+            if "error" in analysis_dict:
+                error_json = json.dumps(analysis_dict, ensure_ascii=False, indent=2)
+
+                cursor.execute(
+                    """
+                    UPDATE forum_posts
+                    SET analysis_json = ?, status = 1
+                    WHERE id = ?
+                    """,
+                    (error_json, db_id)
+                )
+
+                print(f"[Agent 3 ERROR] Analyse für ID {db_id} fehlgeschlagen -> bleibt status=1.")
+                continue
+
             # Füge Metadaten hinzu (damit man später sieht, wie es analysiert wurde)
             analysis_dict["analysis_method"] = f"llm_api ({self.model_name})"
             analysis_dict["weak_signal_relevance"] = analysis_dict.get("urgency") in ["Mittel", "Hoch"]
-            
+
             analysis_json = json.dumps(analysis_dict, ensure_ascii=False, indent=2)
 
             cursor.execute(
@@ -98,7 +114,8 @@ class Agent3Analyzer:
                 """,
                 (analysis_json, db_id)
             )
-            print(f"[Agent 3] LLM-Analyse abgeschlossen für ID {db_id} → status=2.")
+
+            print(f"[Agent 3] LLM-Analyse abgeschlossen für ID {db_id} -> status=2.")
 
         conn.commit()
         conn.close()
