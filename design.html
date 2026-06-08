@@ -1,0 +1,1216 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Service Sonar — Social Intelligence Platform</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,wght@0,400;0,500;1,400&family=DM+Serif+Display:ital@0;1&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.10.0/dist/tabler-icons.min.css">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --p50:#EEEDFE;--p100:#CECBF6;--p200:#AFA9EC;--p600:#534AB7;--p800:#3C3489;
+  --blue50:#E6F1FB;--blue600:#185FA5;
+  --amb50:#FAEEDA;--amb400:#EF9F27;--amb600:#854F0B;
+  --red400:#E24B4A;--red50:#FCEBEB;--red600:#A32D2D;
+  --coral50:#FAECE7;--coral600:#993C1D;
+  --pink50:#FBEAF0;--pink600:#993556;
+  --grn50:#EAF3DE;--grn400:#639922;--grn600:#3B6D11;
+  --teal50:#E1F5EE;--teal600:#0F6E56;
+  --dark:#12112a;--dmid:#1e1c3a;--dcard:#2a2848;--dtag:#3a3860;
+  --text:#1a1830;--muted:#5a5878;--light:#9896b8;
+  --border:rgba(83,74,183,0.12);--bg:#f7f6ff;
+  --rmd:10px;--rlg:18px;--rxl:28px;--max:960px
+}
+html{scroll-behavior:smooth}
+body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);font-size:16px;line-height:1.6;-webkit-font-smoothing:antialiased}
+
+/* NAV */
+nav{position:fixed;top:0;left:0;right:0;height:58px;z-index:200;background:rgba(247,246,255,0.92);backdrop-filter:blur(16px);border-bottom:0.5px solid var(--border)}
+.nav-inner{max-width:var(--max);margin:0 auto;padding:0 36px;height:100%;display:flex;align-items:center;justify-content:space-between}
+.brand{display:flex;align-items:center;gap:10px;text-decoration:none}
+.brand-mark{width:30px;height:30px;background:var(--p600);border-radius:8px;display:grid;place-items:center;position:relative;overflow:hidden}
+.brand-mark::before{content:'';position:absolute;width:18px;height:18px;border-radius:50%;border:2px solid rgba(255,255,255,0.9);animation:sonar 2.4s ease-out infinite}
+.brand-mark::after{content:'';width:6px;height:6px;background:white;border-radius:50%;position:relative;z-index:1}
+@keyframes sonar{0%{transform:scale(.3);opacity:1}100%{transform:scale(1.6);opacity:0}}
+.brand-name{font-size:15px;font-weight:500;color:var(--text)}
+.brand-name span{color:var(--p600)}
+nav ul{display:flex;gap:22px;list-style:none}
+nav ul a{font-size:13px;color:var(--muted);text-decoration:none;transition:color .2s}
+nav ul a:hover{color:var(--p600)}
+.nav-btn{background:var(--p600);color:white;border:none;padding:8px 18px;border-radius:40px;font-size:13px;font-weight:500;font-family:inherit;cursor:pointer;text-decoration:none;transition:background .2s,transform .1s}
+.nav-btn:hover{background:var(--p800);transform:translateY(-1px)}
+
+/* HERO */
+.hero{background:linear-gradient(150deg,#eceaff 0%,#ede8ff 35%,#e5eeff 70%,#eaf4ff 100%);padding:130px 36px 72px;margin-top:58px}
+.hero-inner{max-width:var(--max);margin:0 auto}
+.pill{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:500;letter-spacing:.06em;text-transform:uppercase;color:var(--p600);background:var(--p50);padding:5px 14px;border-radius:40px;margin-bottom:22px}
+.hero h1{font-family:'DM Serif Display',serif;font-size:52px;line-height:1.08;color:var(--text);max-width:620px;margin-bottom:20px}
+.hero h1 em{font-style:italic;color:var(--p600)}
+.hero-sub{font-size:17px;color:var(--muted);max-width:500px;line-height:1.75;margin-bottom:36px}
+.hero-btns{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:56px}
+.btn-p{background:var(--p600);color:white;border:none;padding:14px 28px;border-radius:40px;font-size:15px;font-weight:500;font-family:inherit;cursor:pointer;text-decoration:none;display:inline-block;transition:background .2s,transform .15s}
+.btn-p:hover{background:var(--p800);transform:translateY(-2px)}
+.btn-s{background:white;color:var(--text);border:0.5px solid var(--border);padding:14px 28px;border-radius:40px;font-size:15px;font-weight:500;font-family:inherit;cursor:pointer;text-decoration:none;display:inline-block;transition:background .2s,transform .15s}
+.btn-s:hover{background:#f0efff;transform:translateY(-2px)}
+.hero-stats{display:flex;gap:40px;padding-top:32px;border-top:0.5px solid rgba(83,74,183,0.18)}
+.stat-n{font-family:'DM Serif Display',serif;font-size:30px;color:var(--p600)}
+.stat-l{font-size:13px;color:var(--muted);margin-top:2px}
+
+/* COMMON */
+.sec-wrap{max-width:var(--max);margin:0 auto}
+.sec-label{font-size:12px;font-weight:500;letter-spacing:.07em;text-transform:uppercase;color:var(--p600);margin-bottom:10px}
+.sec-title{font-family:'DM Serif Display',serif;font-size:36px;line-height:1.15;margin-bottom:14px}
+.sec-body{font-size:15px;color:var(--muted);line-height:1.75;max-width:580px;margin-bottom:36px}
+@keyframes fadeUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+
+/* PIPELINE */
+.pipeline-section{padding:80px 36px}
+.pipe-step{display:grid;grid-template-columns:48px 1fr;gap:0 24px;align-items:start;padding:28px 0;border-bottom:0.5px solid var(--border)}
+.pipe-step:last-child{border-bottom:none}
+.pipe-num-col{display:flex;flex-direction:column;align-items:center}
+.pipe-num{width:40px;height:40px;border-radius:50%;display:grid;place-items:center;font-size:15px;font-weight:500;flex-shrink:0}
+.num-1{background:var(--p50);color:var(--p600)} .num-2{background:var(--teal50);color:var(--teal600)} .num-3{background:var(--amb50);color:var(--amb600)}
+.pipe-line{width:1px;flex:1;background:var(--border);margin-top:8px;min-height:40px}
+.pipe-step:last-child .pipe-line{display:none}
+.pipe-tag{display:inline-block;font-size:11px;font-weight:500;letter-spacing:.05em;text-transform:uppercase;padding:3px 10px;border-radius:20px;margin-bottom:8px}
+.tag-p{background:var(--p50);color:var(--p600)} .tag-t{background:var(--teal50);color:var(--teal600)} .tag-a{background:var(--amb50);color:var(--amb600)}
+.pipe-title{font-size:18px;font-weight:500;margin-bottom:6px;font-family:'DM Serif Display',serif}
+.pipe-desc{font-size:14px;color:var(--muted);line-height:1.7;margin-bottom:12px}
+.pipe-tags{display:flex;flex-wrap:wrap;gap:6px}
+.ex-tag{font-size:12px;padding:4px 12px;border-radius:20px;background:white;border:0.5px solid var(--border);color:var(--muted)}
+
+/* ═══ DASHBOARD (Mai) ═══ */
+.dashboard-section{padding:0 36px 80px}
+.dash-outer{background:var(--dark);border-radius:var(--rxl);padding:48px}
+
+/* source badge (replaces full insight-bar) */
+.dash-source-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:28px}
+.source-badge{display:inline-flex;align-items:center;gap:8px;background:rgba(255,255,255,0.05);border:0.5px solid rgba(255,255,255,0.1);border-radius:40px;padding:8px 18px;font-size:13px;color:#bbb}
+.source-badge strong{color:white}
+.live-dot{width:7px;height:7px;border-radius:50%;background:var(--grn400);animation:blink 1.4s infinite}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
+.live-badge{background:rgba(255,255,255,0.06);border:0.5px solid rgba(255,255,255,0.1);border-radius:40px;padding:8px 16px;font-size:13px;color:#bbb;display:flex;align-items:center;gap:6px}
+
+.dash-title-block .sec-label{color:var(--p200)}
+.dash-title-block .sec-title{color:white;margin-bottom:4px}
+.dash-title-block .dash-sub{font-size:13px;color:#666;margin-bottom:28px}
+
+/* problem cards grid */
+.prob-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+.prob-card{background:#2e2c50;border-radius:var(--rlg);padding:20px;border:0.5px solid rgba(255,255,255,0.07);transition:background .2s,transform .15s;cursor:pointer}
+.prob-card:hover{background:#353270;transform:translateY(-2px)}
+.pc-top{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:12px}
+.pc-name{font-size:14px;font-weight:500;color:#e8e6ff;line-height:1.3}
+.pc-status{font-size:10px;font-weight:500;padding:3px 9px;border-radius:20px;white-space:nowrap;margin-left:6px;flex-shrink:0}
+.st-crit{background:rgba(226,75,74,.25);color:#ff9898}
+.st-high{background:rgba(239,159,39,.25);color:#ffd080}
+.st-mid{background:rgba(99,153,34,.25);color:#a8e05f}
+.st-new{background:rgba(175,169,236,.2);color:#c8c3f8}
+
+.pc-pct{font-size:24px;font-weight:500;color:white;font-family:'DM Serif Display',serif;margin-bottom:4px}
+.pc-delta{font-size:11px;margin-bottom:14px}
+.delta-up{color:#ff9898} .delta-stable{color:#a8e05f} .delta-new{color:#c8c3f8}
+
+/* mini sparkline canvas */
+.spark-wrap{height:40px;margin-bottom:12px;position:relative}
+canvas.spark{width:100%;height:100%}
+
+.pc-keywords{display:flex;flex-wrap:wrap;gap:4px;margin-bottom:14px}
+.kw{font-size:10px;background:rgba(255,255,255,0.06);color:#a8a6c8;padding:2px 8px;border-radius:20px}
+
+.pc-detail-btn{width:100%;background:rgba(255,255,255,0.05);border:0.5px solid rgba(255,255,255,0.1);border-radius:var(--rmd);padding:9px;font-size:12px;color:#7a78a0;font-family:inherit;cursor:pointer;transition:background .15s,color .15s;text-align:center}
+.pc-detail-btn:hover{background:rgba(83,74,183,.25);color:#c8c3f8}
+
+/* ═══ MODAL — light theme ═══ */
+.modal-overlay{position:fixed;inset:0;background:rgba(18,17,42,.75);z-index:500;display:none;align-items:center;justify-content:center;backdrop-filter:blur(6px)}
+.modal-overlay.open{display:flex}
+.modal-box{background:white;border-radius:var(--rxl);max-width:640px;width:92%;max-height:90vh;overflow-y:auto;box-shadow:0 24px 80px rgba(0,0,0,.35)}
+
+/* modal top bar */
+.modal-topbar{display:flex;align-items:center;justify-content:space-between;padding:22px 28px 0}
+.modal-label{font-size:11px;text-transform:uppercase;letter-spacing:.07em;color:var(--p600);font-weight:500}
+.modal-close{background:none;border:none;color:#bbb;font-size:18px;cursor:pointer;width:32px;height:32px;border-radius:50%;display:grid;place-items:center;transition:background .15s,color .15s}
+.modal-close:hover{background:#f0f0f0;color:#333}
+
+.modal-body{padding:16px 28px 28px}
+.modal-title{font-family:'DM Serif Display',serif;font-size:26px;color:var(--text);margin-bottom:20px;line-height:1.2}
+
+/* annotated chart */
+.modal-chart-area{background:#faf9ff;border:0.5px solid var(--border);border-radius:var(--rlg);padding:16px 20px 10px;margin-bottom:6px}
+.modal-chart-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+.modal-chart-title{font-size:11px;font-weight:500;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
+.modal-chart-legend{display:flex;align-items:center;gap:12px;font-size:11px;color:var(--muted)}
+.legend-item{display:flex;align-items:center;gap:4px}
+.legend-line{width:16px;height:2px;border-radius:1px}
+.legend-dot-marker{width:8px;height:8px;border-radius:50%;border:2px solid white}
+.modal-yaxis-wrap{display:flex;gap:0}
+.modal-yaxis{display:flex;flex-direction:column;justify-content:space-between;width:36px;padding-bottom:6px;flex-shrink:0}
+.yax-lbl{font-size:9px;color:#bbb;text-align:right;padding-right:6px}
+.modal-chart-wrap{flex:1;height:110px;position:relative}
+canvas.modal-spark{width:100%;height:100%}
+.modal-chart-xaxis{display:flex;justify-content:space-between;padding:4px 0 0;font-size:10px;color:#bbb;padding-left:36px}
+
+.modal-detect-note{font-size:11px;color:var(--p600);display:flex;align-items:center;gap:5px;margin-top:6px;padding:6px 10px;background:var(--p50);border-radius:var(--rmd)}
+.modal-detect-note i{font-size:12px}
+
+.modal-section{margin-bottom:20px}
+.modal-sec-header{display:flex;align-items:center;gap:6px;margin-bottom:10px}
+.modal-sec-title{font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:.06em;color:var(--light)}
+.info-btn{width:16px;height:16px;border-radius:50%;background:var(--border);border:none;cursor:pointer;font-size:10px;color:var(--light);display:grid;place-items:center;position:relative;font-family:inherit}
+.info-btn:hover .info-tooltip{display:block}
+.info-tooltip{display:none;position:absolute;left:20px;top:-4px;background:var(--text);color:white;font-size:11px;padding:8px 12px;border-radius:var(--rmd);width:240px;line-height:1.5;z-index:10;font-style:normal;font-weight:400}
+
+.modal-obs{font-size:14px;color:var(--muted);line-height:1.75}
+
+.modal-trend-row{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+.modal-trend-lbl{font-size:13px;color:var(--text);min-width:180px}
+.modal-trend-bar-wrap{flex:1;height:5px;background:#eee;border-radius:3px;overflow:hidden}
+.modal-trend-bar{height:100%;border-radius:3px}
+.modal-trend-pct{font-size:12px;color:var(--muted);min-width:32px;text-align:right}
+
+.modal-sh-list{display:flex;flex-wrap:wrap;gap:6px}
+.modal-sh{background:var(--p50);border:0.5px solid var(--border);border-radius:20px;padding:5px 14px;font-size:12px;color:var(--p600);font-weight:500}
+
+/* service innovation card — light, expressive */
+.modal-si-card{border-radius:var(--rlg);overflow:hidden;border:0.5px solid var(--border)}
+.modal-si-header{background:var(--p600);padding:18px 22px;display:flex;align-items:center;gap:10px}
+.modal-si-icon{width:32px;height:32px;background:rgba(255,255,255,0.15);border-radius:8px;display:grid;place-items:center;font-size:16px;color:white;flex-shrink:0}
+.modal-si-name{font-size:16px;font-weight:500;color:white}
+.modal-si-body{background:white;padding:16px 22px}
+.modal-si-desc{font-size:13px;color:var(--muted);line-height:1.65;margin-bottom:12px}
+.modal-si-target{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted)}
+.modal-si-target strong{color:var(--text)}
+
+/* ═══ CLUSTERING ═══ */
+.cluster-section{background:white;border-radius:var(--rxl);margin:0 20px;padding:64px 48px;border:0.5px solid var(--border)}
+.cluster-section .sec-label{color:var(--p600)}
+.cluster-section .sec-title{color:var(--text);margin-bottom:14px}
+.cluster-section .sec-body{color:var(--muted);margin-bottom:0}
+
+/* flow explanation */
+.cl-flow-row{display:flex;align-items:center;gap:0;margin:28px 0 36px;background:var(--p50);border-radius:var(--rlg);padding:18px 24px;border:0.5px solid var(--border)}
+.cl-flow-step{text-align:center;flex:1}
+.cl-flow-icon{font-size:20px;color:var(--p600);margin-bottom:6px}
+.cl-flow-label{font-size:12px;font-weight:500;color:var(--text);margin-bottom:2px}
+.cl-flow-sub{font-size:11px;color:var(--light);line-height:1.4}
+.cl-flow-arrow{color:var(--p100);font-size:20px;flex-shrink:0;padding:0 8px}
+
+/* cluster grid */
+.cluster-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+
+.cl-card{background:white;border-radius:var(--rlg);padding:0;border:1px solid #e8e6ff;transition:box-shadow .2s,transform .15s;cursor:default;overflow:hidden}
+.cl-card:hover{box-shadow:0 8px 32px rgba(83,74,183,.12);transform:translateY(-2px)}
+
+/* colored top stripe per severity */
+.cl-stripe{height:4px;width:100%}
+.stripe-crit{background:linear-gradient(90deg,#E24B4A,#f09090)}
+.stripe-high{background:linear-gradient(90deg,#EF9F27,#f7cc80)}
+.stripe-mid{background:linear-gradient(90deg,#639922,#a0cc60)}
+.stripe-emg{background:linear-gradient(90deg,var(--p600),var(--p200))}
+
+.cl-card-inner{padding:22px}
+
+/* card top */
+.cl-top{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:4px}
+.cl-name{font-size:15px;font-weight:500;color:var(--text)}
+.cl-signal-badge{font-size:10px;font-weight:500;padding:3px 10px;border-radius:20px;flex-shrink:0;margin-left:8px}
+.sig-crit{background:var(--red50);color:var(--red600)}
+.sig-high{background:var(--amb50);color:var(--amb600)}
+.sig-mid{background:var(--grn50);color:var(--grn600)}
+.sig-emg{background:var(--p50);color:var(--p600)}
+
+.cl-count{font-size:12px;color:var(--light);margin-bottom:16px}
+
+/* source signals */
+.cl-sources-label{font-size:10px;font-weight:500;text-transform:uppercase;letter-spacing:.06em;color:var(--light);margin-bottom:7px}
+.cl-sources{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:16px}
+.cl-src-tag{font-size:11px;background:#f4f3ff;color:var(--p600);padding:3px 11px;border-radius:20px;border:0.5px solid #d8d4f8;font-weight:500}
+
+/* systemic diagnosis */
+.cl-diagnosis{background:var(--text);border-radius:var(--rmd);padding:16px 18px;margin-bottom:14px}
+.cl-diag-label{font-size:10px;font-weight:500;text-transform:uppercase;letter-spacing:.07em;color:var(--p200);margin-bottom:8px;display:flex;align-items:center;gap:4px}
+.cl-diag-label i{font-size:12px}
+.cl-diag-text{font-size:13px;color:#e0defc;line-height:1.65}
+
+/* overlap */
+.cl-overlap{font-size:11px;color:var(--light);display:flex;align-items:center;gap:5px}
+.cl-overlap i{font-size:11px;color:var(--p200)}
+
+/* ═══ STAKEHOLDER DASHBOARD ═══ */
+.stakeholder-section{background:#f4f3ff;border-radius:var(--rxl);margin:24px 20px;padding:64px 48px}
+.stakeholder-section .sec-title{margin-bottom:14px}
+.stakeholder-section .sec-body{margin-bottom:32px}
+
+/* overview grid */
+.sh-overview-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:28px}
+.sh-ov-card{background:white;border:0.5px solid var(--border);border-radius:var(--rlg);padding:18px;cursor:pointer;transition:box-shadow .2s,transform .15s;border-top:3px solid transparent}
+.sh-ov-card:hover{box-shadow:0 4px 20px rgba(83,74,183,.1);transform:translateY(-1px)}
+.sh-ov-card.active{border-top-color:var(--p600);box-shadow:0 4px 20px rgba(83,74,183,.15)}
+.sh-ov-icon{font-size:20px;color:var(--p600);margin-bottom:8px}
+.sh-ov-name{font-size:14px;font-weight:500;margin-bottom:4px}
+.sh-ov-role{font-size:12px;color:var(--muted);margin-bottom:10px;line-height:1.4}
+.sh-ov-badges{display:flex;flex-wrap:wrap;gap:4px}
+.badge{font-size:11px;padding:3px 10px;border-radius:20px;font-weight:500}
+.b-h{background:var(--blue50);color:var(--blue600)}
+.b-s{background:var(--coral50);color:var(--coral600)}
+.b-f{background:var(--amb50);color:var(--amb600)}
+.b-l{background:var(--p50);color:var(--p600)}
+.b-i{background:var(--pink50);color:var(--pink600)}
+.b-g{background:var(--grn50);color:var(--grn600)}
+
+/* "occupied" / "open" label */
+.sh-occ{display:flex;align-items:center;gap:5px;font-size:11px;margin-top:10px}
+.occ-dot{width:6px;height:6px;border-radius:50%}
+.occ-taken{background:var(--amb400)} .occ-open{background:var(--grn400)}
+
+/* detail panel */
+.sh-detail-panel{background:white;border:0.5px solid var(--border);border-radius:var(--rlg);padding:28px;margin-bottom:20px;animation:fadeUp .25s ease}
+.shd-header{display:flex;align-items:center;gap:14px;margin-bottom:20px}
+.shd-icon-big{width:44px;height:44px;border-radius:12px;background:var(--p50);display:grid;place-items:center;font-size:22px;color:var(--p600)}
+.shd-name{font-size:18px;font-weight:500}
+.shd-role{font-size:13px;color:var(--muted)}
+.shd-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.shd-col-title{font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:.06em;color:var(--light);margin-bottom:10px}
+.shd-problem-item{display:flex;align-items:flex-start;gap:10px;padding:10px 0;border-bottom:0.5px solid var(--border)}
+.shd-problem-item:last-child{border-bottom:none}
+.shd-prob-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;margin-top:4px}
+.shd-prob-name{font-size:13px;font-weight:500;margin-bottom:2px}
+.shd-prob-solution{font-size:12px;color:var(--muted);line-height:1.5}
+.shd-prob-why{font-size:11px;color:var(--p600);margin-top:3px;font-style:italic}
+.shd-action-card{background:#faf9ff;border-radius:var(--rmd);padding:14px;margin-top:10px}
+.shd-action-title{font-size:12px;font-weight:500;color:var(--p600);margin-bottom:6px}
+.shd-action-txt{font-size:13px;color:var(--muted);line-height:1.55}
+.sh-open-hint{background:var(--grn50);border-radius:var(--rmd);padding:14px 18px;font-size:13px;color:var(--grn600);display:flex;align-items:center;gap:8px;margin-top:8px}
+
+/* ═══ AI ═══ */
+.ai-section{padding:0 36px 80px}
+.ai-inner{max-width:var(--max);margin:0 auto}
+.ai-box{background:var(--p50);border-radius:var(--rxl);padding:36px}
+.ai-box-label{font-size:14px;color:var(--p600);font-weight:500;margin-bottom:14px}
+.ai-row{display:flex;gap:10px}
+.ai-input{flex:1;border:0.5px solid #c5c0f0;border-radius:40px;padding:13px 20px;font-size:14px;font-family:inherit;outline:none;background:white;color:var(--text);transition:border-color .2s,box-shadow .2s}
+.ai-input:focus{border-color:var(--p600);box-shadow:0 0 0 3px rgba(83,74,183,.1)}
+.ai-go{background:var(--p600);color:white;border:none;border-radius:40px;padding:13px 22px;font-size:14px;font-family:inherit;cursor:pointer;font-weight:500;white-space:nowrap;transition:background .2s,transform .15s}
+.ai-go:hover{background:var(--p800);transform:translateY(-1px)}
+.ai-go:disabled{opacity:.6;cursor:not-allowed;transform:none}
+.ai-suggestions{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}
+.sugg-btn{font-size:12px;color:var(--p600);background:white;border:0.5px solid #c5c0f0;border-radius:40px;padding:6px 14px;cursor:pointer;font-family:inherit;transition:background .15s}
+.sugg-btn:hover{background:var(--p50)}
+.ai-output{margin-top:18px;background:white;border:0.5px solid #ddd;border-radius:var(--rlg);padding:22px;font-size:14px;line-height:1.75;color:#333;display:none;animation:fadeUp .3s ease}
+.ai-output.on{display:block}
+.ai-output strong{color:var(--p600)}
+
+/* FOOTER */
+footer{background:var(--dark);border-radius:var(--rxl) var(--rxl) 0 0;margin:24px 20px 0;padding:40px 48px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:16px}
+.footer-txt{font-size:13px;color:#555}
+.footer-links{display:flex;gap:22px}
+.footer-links a{font-size:13px;color:var(--p200);text-decoration:none;transition:color .2s}
+.footer-links a:hover{color:white}
+
+@media(max-width:700px){
+  nav ul{display:none}
+  .hero h1{font-size:34px}
+  .prob-grid,.cluster-grid,.sh-overview-grid,.shd-grid{grid-template-columns:1fr}
+  .insight-bar{flex-wrap:wrap}
+  .ib-item{flex:none;width:50%}
+  .cluster-section,.stakeholder-section{margin:0 10px;padding:36px 20px}
+  .dash-outer{padding:28px 20px}
+  footer{flex-direction:column;align-items:flex-start;margin:12px 10px 0;padding:28px 20px}
+}
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="nav-inner">
+    <a class="brand" href="#">
+      <div class="brand-mark"></div>
+      <span class="brand-name">Service <span>Sonar</span></span>
+    </a>
+    <ul>
+      <li><a href="#pipeline">Pipeline</a></li>
+      <li><a href="#dashboard">Signale</a></li>
+      <li><a href="#cluster">Clustering</a></li>
+      <li><a href="#stakeholder">Stakeholder</a></li>
+      <li><a href="#ai">KI-Tool</a></li>
+    </ul>
+    <a class="nav-btn" href="#ai">Idee generieren</a>
+  </div>
+</nav>
+
+<!-- HERO -->
+<div class="hero">
+  <div class="hero-inner">
+    <div class="pill"><i class="ti ti-radar"></i>Social Intelligence Platform</div>
+    <h1>Versteckte soziale Bedürfnisse <em>sichtbar</em> machen</h1>
+    <p class="hero-sub">Service Sonar erkennt schwache Signale aus studentischen Quellen — bevor sie zu Krisen werden. KI-gestützte Früherkennung für bessere soziale Dienstleistungen.</p>
+    <div class="hero-btns">
+      <a class="btn-p" href="#dashboard">Dashboard öffnen</a>
+      <a class="btn-s" href="#pipeline">Wie es funktioniert</a>
+    </div>
+    <div class="hero-stats">
+      <div><div class="stat-n">2.400+</div><div class="stat-l">Analysierte Texte</div></div>
+      <div><div class="stat-n">6</div><div class="stat-l">Aktive Problemcluster</div></div>
+      <div><div class="stat-n">3</div><div class="stat-l">Kritische Signale</div></div>
+      <div><div class="stat-n">FAU</div><div class="stat-l">Nürnberg 2026</div></div>
+    </div>
+  </div>
+</div>
+
+<!-- PIPELINE -->
+<section class="pipeline-section" id="pipeline">
+  <div class="sec-wrap">
+    <div class="sec-label">Was Service Sonar leistet</div>
+    <h2 class="sec-title">Drei Schritte von Daten zur Innovation</h2>
+    <p class="sec-body">Service Sonar kombiniert automatisiertes Web-Crawling, semantische Clusteranalyse und KI-Generierung zu einem durchgängigen Pipeline-System.</p>
+    <div class="pipeline-steps">
+      <div class="pipe-step">
+        <div class="pipe-num-col"><div class="pipe-num num-1">1</div><div class="pipe-line"></div></div>
+        <div>
+          <span class="pipe-tag tag-p">Weak Signal Detection</span>
+          <div class="pipe-title">We crawl student forums and extract recurring pain patterns</div>
+          <p class="pipe-desc">Unser Crawler sammelt täglich Texte aus studentischen Foren, Beratungsplattformen und sozialen Netzwerken. NLP-Modelle erkennen wiederkehrende Formulierungen und emotionale Muster — bevor sie in der Breite sichtbar werden.</p>
+          <div class="pipe-tags"><span class="ex-tag">Forum-Crawler</span><span class="ex-tag">NLP-Filterung</span><span class="ex-tag">Sentiment-Analyse</span><span class="ex-tag">Trendberechnung</span></div>
+        </div>
+      </div>
+      <div class="pipe-step">
+        <div class="pipe-num-col"><div class="pipe-num num-2">2</div><div class="pipe-line"></div></div>
+        <div>
+          <span class="pipe-tag tag-t">Dynamic Problem Clustering</span>
+          <div class="pipe-title">We group signals into structural problem clusters</div>
+          <p class="pipe-desc">Ähnliche Signale werden semantisch gebündelt und zu Clustern verdichtet. So entstehen keine Kategorien, sondern systemische Befunde — mit sichtbaren Überlappungen zwischen den Clustern.</p>
+          <div class="pipe-tags"><span class="ex-tag">Embedding-Clustering</span><span class="ex-tag">Semantische Ähnlichkeit</span><span class="ex-tag">Intensitätsbewertung</span><span class="ex-tag">Overlap-Mapping</span></div>
+        </div>
+      </div>
+      <div class="pipe-step">
+        <div class="pipe-num-col"><div class="pipe-num num-3">3</div><div class="pipe-line"></div></div>
+        <div>
+          <span class="pipe-tag tag-a">Service Innovation Output</span>
+          <div class="pipe-title">We map each cluster to stakeholders and generate service ideas</div>
+          <p class="pipe-desc">Aus jedem Cluster leitet das System ab, wer zuständig sein könnte — und schlägt konkrete Serviceideen vor. Kein AI-Summary, sondern strukturierte Entscheidungsgrundlage für Stakeholder.</p>
+          <div class="pipe-tags"><span class="ex-tag">LLM-Generierung</span><span class="ex-tag">Stakeholder-Mapping</span><span class="ex-tag">Service-Prototypen</span><span class="ex-tag">Decision Support</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- DASHBOARD (Mai — Problem Cards) -->
+<section class="dashboard-section" id="dashboard">
+  <div class="dash-outer">
+    <div class="dash-source-row">
+      <div class="source-badge"><i class="ti ti-database" style="font-size:14px;color:var(--p200)"></i><strong id="source-count">487 Quellen analysiert · 3-Monats-Trendanalyse</strong></div>
+      <div class="live-badge"><div class="live-dot"></div>Live-Monitoring aktiv</div>
+    </div>
+
+    <div class="dash-title-block">
+      <div class="sec-label">Aktuelles Problem-Dashboard</div>
+      <h2 class="sec-title" style="color:white;margin-bottom:4px;">Mai 2026 — Top-Signale</h2>
+      <div class="dash-sub">Wird monatlich aktualisiert · Klick auf eine Karte für detaillierte Analyse</div>
+    </div>
+
+    <div class="prob-grid">
+      <!-- Card 1: Housing -->
+      <div class="prob-card" onclick="openModal('housing')">
+        <div class="pc-top"><span class="pc-name">Wohnungsstress</span><span class="pc-status st-crit">Kritisch</span></div>
+        <div class="pc-pct">82%</div>
+        <div class="pc-delta delta-up">↑ +18% seit März · steigende Intensität</div>
+        <div class="spark-wrap"><canvas class="spark" id="sp-housing"></canvas></div>
+        <div class="pc-keywords"><span class="kw">Mietanstieg</span><span class="kw">WG-Konflikt</span><span class="kw">Obdachlosigkeit</span></div>
+        <button class="pc-detail-btn">Problem detailliert ansehen →</button>
+      </div>
+      <!-- Card 2: Psyche -->
+      <div class="prob-card" onclick="openModal('psyche')">
+        <div class="pc-top"><span class="pc-name">Psychische Belastung</span><span class="pc-status st-crit">Kritisch</span></div>
+        <div class="pc-pct">74%</div>
+        <div class="pc-delta delta-up">↑ +12% seit März · Burnout-Cluster wächst</div>
+        <div class="spark-wrap"><canvas class="spark" id="sp-psyche"></canvas></div>
+        <div class="pc-keywords"><span class="kw">Burnout</span><span class="kw">Prüfungsstress</span><span class="kw">Isolation</span></div>
+        <button class="pc-detail-btn">Problem detailliert ansehen →</button>
+      </div>
+      <!-- Card 3: Finanzen -->
+      <div class="prob-card" onclick="openModal('finanzen')">
+        <div class="pc-top"><span class="pc-name">Finanzstress</span><span class="pc-status st-high">Hoch</span></div>
+        <div class="pc-pct">61%</div>
+        <div class="pc-delta delta-up">↑ +7% seit März · BAföG-Ablehnungen steigen</div>
+        <div class="spark-wrap"><canvas class="spark" id="sp-finanzen"></canvas></div>
+        <div class="pc-keywords"><span class="kw">BAföG</span><span class="kw">Schulden</span><span class="kw">Nebenjob</span></div>
+        <button class="pc-detail-btn">Problem detailliert ansehen →</button>
+      </div>
+      <!-- Card 4: Sprache -->
+      <div class="prob-card" onclick="openModal('sprache')">
+        <div class="pc-top"><span class="pc-name">Sprachbarrieren</span><span class="pc-status st-high">Hoch</span></div>
+        <div class="pc-pct">48%</div>
+        <div class="pc-delta delta-stable">→ stabil · Int. Studierende besonders betroffen</div>
+        <div class="spark-wrap"><canvas class="spark" id="sp-sprache"></canvas></div>
+        <div class="pc-keywords"><span class="kw">Bürokratie</span><span class="kw">Formulare</span><span class="kw">Behörden</span></div>
+        <button class="pc-detail-btn">Problem detailliert ansehen →</button>
+      </div>
+      <!-- Card 5: Isolation -->
+      <div class="prob-card" onclick="openModal('isolation')">
+        <div class="pc-top"><span class="pc-name">Soziale Isolation</span><span class="pc-status st-mid">Mittel</span></div>
+        <div class="pc-pct">35%</div>
+        <div class="pc-delta delta-stable">→ leicht wachsend · Erstsemester-Cluster</div>
+        <div class="spark-wrap"><canvas class="spark" id="sp-isolation"></canvas></div>
+        <div class="pc-keywords"><span class="kw">Einsamkeit</span><span class="kw">Netzwerke</span><span class="kw">Erstsemester</span></div>
+        <button class="pc-detail-btn">Problem detailliert ansehen →</button>
+      </div>
+      <!-- Card 6: Bürokratie (NEW) -->
+      <div class="prob-card" onclick="openModal('buerokratie')">
+        <div class="pc-top"><span class="pc-name">Behörden-Überforderung</span><span class="pc-status st-new">Neu erkannt</span></div>
+        <div class="pc-pct">29%</div>
+        <div class="pc-delta delta-new">⬡ Emerging signal · seit April sichtbar</div>
+        <div class="spark-wrap"><canvas class="spark" id="sp-buerokratie"></canvas></div>
+        <div class="pc-keywords"><span class="kw">Formulare</span><span class="kw">Fristen</span><span class="kw">Orientierung</span></div>
+        <button class="pc-detail-btn">Problem detailliert ansehen →</button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- MODAL — light theme -->
+<div class="modal-overlay" id="modal-overlay" onclick="closeModal(event)">
+  <div class="modal-box" id="modal-box">
+    <div class="modal-topbar">
+      <div class="modal-label" id="m-label"></div>
+      <button class="modal-close" onclick="closeModal()"><i class="ti ti-x"></i></button>
+    </div>
+    <div class="modal-body">
+      <div class="modal-title" id="m-title"></div>
+
+      <!-- annotated chart -->
+      <div class="modal-chart-area">
+        <div class="modal-chart-header">
+          <div class="modal-chart-title">Erwähnungen pro Woche (Anz.)</div>
+          <div class="modal-chart-legend">
+            <span class="legend-item"><span class="legend-line" id="m-legend-line"></span>Signal-Verlauf</span>
+            <span class="legend-item"><span class="legend-dot-marker" id="m-legend-dot" style="background:#534AB7"></span>Erstmalig erkannt</span>
+          </div>
+        </div>
+        <div class="modal-yaxis-wrap">
+          <div class="modal-yaxis" id="m-yaxis"></div>
+          <div class="modal-chart-wrap"><canvas class="modal-spark" id="m-chart"></canvas></div>
+        </div>
+        <div class="modal-chart-xaxis"><span>März</span><span>April</span><span>Mai</span></div>
+      </div>
+      <div class="modal-detect-note" id="m-detect">
+        <i class="ti ti-eye"></i><span id="m-detect-txt"></span>
+      </div>
+
+      <div style="height:18px"></div>
+
+      <div class="modal-section">
+        <div class="modal-sec-header"><div class="modal-sec-title">Beobachtungen</div></div>
+        <p class="modal-obs" id="m-obs"></p>
+      </div>
+
+      <div class="modal-section">
+        <div class="modal-sec-header">
+          <div class="modal-sec-title">Signalentwicklung</div>
+          <div class="info-btn" tabindex="0">i
+            <div class="info-tooltip">Gemessen als Anteil der Beiträge, die dieses Thema explizit erwähnen. Basis: alle analysierten Quellen im jeweiligen Zeitraum. Y-Achse zeigt absolute Wochenwerte; Balken zeigen relativen Anteil (%) am Gesamtvolumen.</div>
+          </div>
+        </div>
+        <div id="m-trend-rows"></div>
+      </div>
+
+      <div class="modal-section">
+        <div class="modal-sec-header"><div class="modal-sec-title">Betroffene Stakeholder</div></div>
+        <div class="modal-sh-list" id="m-sh"></div>
+      </div>
+
+      <div class="modal-section">
+        <div class="modal-sec-header"><div class="modal-sec-title">Mögliche Service Innovation</div></div>
+        <div class="modal-si-card" id="m-si-card">
+          <div class="modal-si-header">
+            <div class="modal-si-icon"><i class="ti ti-bulb"></i></div>
+            <div class="modal-si-name" id="m-si-name"></div>
+          </div>
+          <div class="modal-si-body">
+            <div class="modal-si-desc" id="m-si-desc"></div>
+            <div class="modal-si-target"><i class="ti ti-arrow-right" style="font-size:12px;color:var(--p600)"></i><span>Zuständig: <strong id="m-si-who"></strong></span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- DYNAMIC PROBLEM CLUSTERING -->
+<section style="padding:60px 0" id="cluster">
+  <div class="cluster-section">
+    <div class="sec-label">Dynamic Problem Clustering</div>
+    <h2 class="sec-title">Von Symptomen zu systemischen Lücken</h2>
+    <p class="sec-body">Einzelne Signale zeigen Symptome. Erst wenn mehrere Signale zusammen auftreten, wird der systemische Riss sichtbar — und damit der Ort, an dem ein neuer Service wirklich etwas verändern könnte.</p>
+
+    <!-- flow explanation -->
+    <div class="cl-flow-row">
+      <div class="cl-flow-step">
+        <div class="cl-flow-icon"><i class="ti ti-antenna-bars-3"></i></div>
+        <div class="cl-flow-label">Einzelsignale</div>
+      </div>
+      <div class="cl-flow-arrow">→</div>
+      <div class="cl-flow-step">
+        <div class="cl-flow-icon"><i class="ti ti-circles-relation"></i></div>
+        <div class="cl-flow-label">Clustering</div>
+      </div>
+      <div class="cl-flow-arrow">→</div>
+      <div class="cl-flow-step">
+        <div class="cl-flow-icon"><i class="ti ti-alert-circle"></i></div>
+        <div class="cl-flow-label">Systemischer Riss</div>
+      </div>
+      <div class="cl-flow-arrow">→</div>
+      <div class="cl-flow-step">
+        <div class="cl-flow-icon"><i class="ti ti-bulb"></i></div>
+        <div class="cl-flow-label">Service Opportunity</div>
+      </div>
+    </div>
+
+    <!-- badge legend -->
+    <div style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:20px;padding:14px 18px;background:#faf9ff;border-radius:var(--rmd);border:0.5px solid var(--border);align-items:center">
+      <span style="font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:.06em;color:var(--light);margin-right:4px">Signalstatus:</span>
+      <span style="display:flex;align-items:center;gap:5px;font-size:12px;color:var(--red600)"><span style="background:var(--red50);color:var(--red600);font-size:10px;font-weight:500;padding:2px 9px;border-radius:20px">Kritisch</span>Mehrere Signale eskalieren — sofortiger Handlungsbedarf</span>
+      <span style="color:#ddd">·</span>
+      <span style="display:flex;align-items:center;gap:5px;font-size:12px;color:var(--amb600)"><span style="background:var(--amb50);color:var(--amb600);font-size:10px;font-weight:500;padding:2px 9px;border-radius:20px">Hoch</span>Wachsendes Muster, Intervention empfohlen</span>
+      <span style="color:#ddd">·</span>
+      <span style="display:flex;align-items:center;gap:5px;font-size:12px;color:var(--grn600)"><span style="background:var(--grn50);color:var(--grn600);font-size:10px;font-weight:500;padding:2px 9px;border-radius:20px">Mittel</span>Sichtbar, noch kein akuter Druck</span>
+      <span style="color:#ddd">·</span>
+      <span style="display:flex;align-items:center;gap:5px;font-size:12px;color:var(--p600)"><span style="background:var(--p50);color:var(--p600);font-size:10px;font-weight:500;padding:2px 9px;border-radius:20px">Emerging</span>Neu erkannt, Richtung noch unklar</span>
+    </div>
+
+    <div class="cluster-grid">
+
+      <!-- Housing -->
+      <div class="cl-card">
+        <div class="cl-stripe stripe-crit"></div>
+        <div class="cl-card-inner">
+        <div class="cl-top">
+          <div><div class="cl-name">Strukturelle Wohnraumversorgung</div><div class="cl-count">340 Erwähnungen · 3 Monate</div></div>
+          <span class="cl-signal-badge sig-crit">Kritisch</span>
+        </div>
+        <div class="cl-sources-label">Zusammengesetzte Signale</div>
+        <div class="cl-sources">
+          <span class="cl-src-tag">Mietanstieg</span>
+          <span class="cl-src-tag">WG-Konflikte</span>
+          <span class="cl-src-tag">Wohnheimmangel</span>
+          <span class="cl-src-tag">Angst vor Obdachlosigkeit</span>
+        </div>
+        <div class="cl-diagnosis">
+          <div class="cl-diag-label"><i class="ti ti-alert-circle"></i>Systemischer Befund</div>
+          <div class="cl-diag-text">Das Wohnraumsystem versagt strukturell für vulnerable Studierende — besonders internationale — die weder Netzwerke noch Sprachkenntnisse für die Wohnungssuche besitzen.</div>
+        </div>
+        <div class="cl-overlap"><i class="ti ti-git-branch"></i>Verstärkt durch: Psychische Belastung, Integration & Sprache</div>
+        </div>
+      </div>
+
+      <!-- Psyche -->
+      <div class="cl-card">
+        <div class="cl-stripe stripe-crit"></div>
+        <div class="cl-card-inner">
+        <div class="cl-top">
+          <div><div class="cl-name">Psychosoziale Belastungsgrenze</div><div class="cl-count">290 Erwähnungen · 3 Monate</div></div>
+          <span class="cl-signal-badge sig-crit">Kritisch</span>
+        </div>
+        <div class="cl-sources-label">Zusammengesetzte Signale</div>
+        <div class="cl-sources">
+          <span class="cl-src-tag">Burnout</span>
+          <span class="cl-src-tag">Prüfungsangst</span>
+          <span class="cl-src-tag">Schlafprobleme</span>
+          <span class="cl-src-tag">Überforderung</span>
+        </div>
+        <div class="cl-diagnosis">
+          <div class="cl-diag-label"><i class="ti ti-alert-circle"></i>Systemischer Befund</div>
+          <div class="cl-diag-text">Beratungskapazitäten sind chronisch überlastet — Wartezeiten bis 6 Wochen. Das System reagiert erst bei Krise, nicht präventiv. Früherkennung fehlt vollständig.</div>
+        </div>
+        <div class="cl-overlap"><i class="ti ti-git-branch"></i>Verstärkt durch: Soziale Isolation, Housing-Stress</div>
+        </div>
+      </div>
+
+      <!-- Finanzen -->
+      <div class="cl-card">
+        <div class="cl-stripe stripe-high"></div>
+        <div class="cl-card-inner">
+        <div class="cl-top">
+          <div><div class="cl-name">Finanzielle Existenzsicherung</div><div class="cl-count">215 Erwähnungen · 3 Monate</div></div>
+          <span class="cl-signal-badge sig-high">Hoch</span>
+        </div>
+        <div class="cl-sources-label">Zusammengesetzte Signale</div>
+        <div class="cl-sources">
+          <span class="cl-src-tag">BAföG-Ablehnung</span>
+          <span class="cl-src-tag">Schulden</span>
+          <span class="cl-src-tag">Mehrfachjobs</span>
+          <span class="cl-src-tag">Existenzangst</span>
+        </div>
+        <div class="cl-diagnosis">
+          <div class="cl-diag-label"><i class="ti ti-alert-circle"></i>Systemischer Befund</div>
+          <div class="cl-diag-text">BAföG-Bürokratie ist für viele Studierende unüberwindbar. Nothilfefonds existieren, sind aber kaum bekannt. Finanzielle Krisen eskalieren unbemerkt, bis sie das Studium gefährden.</div>
+        </div>
+        <div class="cl-overlap"><i class="ti ti-git-branch"></i>Verstärkt durch: Housing-Stress, Psychische Belastung</div>
+        </div>
+      </div>
+
+      <!-- Integration -->
+      <div class="cl-card">
+        <div class="cl-stripe stripe-high"></div>
+        <div class="cl-card-inner">
+        <div class="cl-top">
+          <div><div class="cl-name">Systemzugang für Internationale</div><div class="cl-count">180 Erwähnungen · 3 Monate</div></div>
+          <span class="cl-signal-badge sig-high">Hoch</span>
+        </div>
+        <div class="cl-sources-label">Zusammengesetzte Signale</div>
+        <div class="cl-sources">
+          <span class="cl-src-tag">Sprachbarriere</span>
+          <span class="cl-src-tag">Behörden-Formulare</span>
+          <span class="cl-src-tag">Kulturschock</span>
+          <span class="cl-src-tag">Orientierungslosigkeit</span>
+        </div>
+        <div class="cl-diagnosis">
+          <div class="cl-diag-label"><i class="ti ti-alert-circle"></i>Systemischer Befund</div>
+          <div class="cl-diag-text">Deutsche Verwaltungsprozesse sind für internationale Studierende faktisch unzugänglich. Das System setzt Sprachkenntnisse und lokales Wissen voraus, das Neuankömmlinge per Definition nicht haben.</div>
+        </div>
+        <div class="cl-overlap"><i class="ti ti-git-branch"></i>Verstärkt durch: Housing-Stress, Behörden-Überforderung</div>
+        </div>
+      </div>
+
+      <!-- Isolation -->
+      <div class="cl-card">
+        <div class="cl-stripe stripe-mid"></div>
+        <div class="cl-card-inner">
+        <div class="cl-top">
+          <div><div class="cl-name">Soziale Eingliederung</div><div class="cl-count">140 Erwähnungen · 3 Monate</div></div>
+          <span class="cl-signal-badge sig-mid">Mittel</span>
+        </div>
+        <div class="cl-sources-label">Zusammengesetzte Signale</div>
+        <div class="cl-sources">
+          <span class="cl-src-tag">Einsamkeit</span>
+          <span class="cl-src-tag">Erstsemester-Überforderung</span>
+          <span class="cl-src-tag">Fehlende Netzwerke</span>
+        </div>
+        <div class="cl-diagnosis">
+          <div class="cl-diag-label"><i class="ti ti-alert-circle"></i>Systemischer Befund</div>
+          <div class="cl-diag-text">Formelle Onboarding-Strukturen enden nach der Einführungswoche. Danach sind Studierende auf sich allein gestellt — kein systematisches Netzwerk-Building, keine Frühwarnung bei Isolation.</div>
+        </div>
+        <div class="cl-overlap"><i class="ti ti-git-branch"></i>Verstärkt durch: Psychische Belastung, Integration</div>
+        </div>
+      </div>
+
+      <!-- Bürokratie -->
+      <div class="cl-card">
+        <div class="cl-stripe stripe-emg"></div>
+        <div class="cl-card-inner">
+        <div class="cl-top">
+          <div><div class="cl-name">Behördliche Orientierung</div><div class="cl-count">95 Erwähnungen · seit April</div></div>
+          <span class="cl-signal-badge sig-emg">Emerging</span>
+        </div>
+        <div class="cl-sources-label">Zusammengesetzte Signale</div>
+        <div class="cl-sources">
+          <span class="cl-src-tag">Formularpanik</span>
+          <span class="cl-src-tag">Fristverwirrung</span>
+          <span class="cl-src-tag">Kein Ansprechpartner</span>
+        </div>
+        <div class="cl-diagnosis">
+          <div class="cl-diag-label"><i class="ti ti-eye"></i>Emerging — noch kein Systemversagen, aber...</div>
+          <div class="cl-diag-text">Noch ein schwaches Signal, aber mit klarer Richtung: Studierende finden keine einheitliche Anlaufstelle für Behördenfragen. Wenn dieses Signal wächst, droht ein weiterer systemischer Riss.</div>
+        </div>
+        <div class="cl-overlap"><i class="ti ti-git-branch"></i>Verstärkt durch: Integration & Sprache, Finanzen</div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<!-- STAKEHOLDER DASHBOARD -->
+<div class="stakeholder-section" id="stakeholder">
+  <div class="sec-label">Stakeholder Dashboard</div>
+  <h2 class="sec-title">Wer macht was — und was bleibt offen?</h2>
+  <p class="sec-body" style="margin-bottom:20px;">Klick auf eine Karte für Details zu Lösungen und Innovationspotenzial.</p>
+
+  <div class="sh-overview-grid" id="sh-grid">
+    <div class="sh-ov-card active" onclick="showSH('hochschule',this)">
+      <div class="sh-ov-icon"><i class="ti ti-building"></i></div>
+      <div class="sh-ov-name">Hochschulen</div>
+      <div class="sh-ov-role">Bieten psychologische Beratung, Onboarding-Programme und Housing-Infos für alle Studierenden</div>
+      <div class="sh-ov-badges"><span class="badge b-s">Psyche</span><span class="badge b-h">Housing</span><span class="badge b-g">Isolation</span></div>
+      <div class="sh-occ"><div class="occ-dot occ-taken"></div><span style="color:var(--amb600);font-size:11px">Aktiv bearbeitet</span></div>
+    </div>
+    <div class="sh-ov-card" onclick="showSH('studentenwerk',this)">
+      <div class="sh-ov-icon"><i class="ti ti-building-community"></i></div>
+      <div class="sh-ov-name">Studierendenwerke</div>
+      <div class="sh-ov-role">Vergeben Wohnheimplätze, beraten zu BAföG und betreiben Mensen und Sozialberatung</div>
+      <div class="sh-ov-badges"><span class="badge b-h">Housing</span><span class="badge b-f">Finanzen</span></div>
+      <div class="sh-occ"><div class="occ-dot occ-taken"></div><span style="color:var(--amb600);font-size:11px">Aktiv bearbeitet</span></div>
+    </div>
+    <div class="sh-ov-card" onclick="showSH('sozial',this)">
+      <div class="sh-ov-icon"><i class="ti ti-heart"></i></div>
+      <div class="sh-ov-name">Sozialdienste</div>
+      <div class="sh-ov-role">Leisten Krisenintervention, betreiben Krisentelefon und begleiten Studierende in Notlagen</div>
+      <div class="sh-ov-badges"><span class="badge b-s">Psyche</span><span class="badge b-i">Isolation</span></div>
+      <div class="sh-occ"><div class="occ-dot occ-taken"></div><span style="color:var(--amb600);font-size:11px">Aktiv bearbeitet</span></div>
+    </div>
+    <div class="sh-ov-card" onclick="showSH('intoffice',this)">
+      <div class="sh-ov-icon"><i class="ti ti-world"></i></div>
+      <div class="sh-ov-name">Int. Office</div>
+      <div class="sh-ov-role">Unterstützen internationale Studierende bei Einreise, Behörden und Wohnungssuche auf Englisch</div>
+      <div class="sh-ov-badges"><span class="badge b-l">Sprache</span><span class="badge b-h">Housing</span></div>
+      <div class="sh-occ"><div class="occ-dot occ-taken"></div><span style="color:var(--amb600);font-size:11px">Aktiv bearbeitet</span></div>
+    </div>
+    <div class="sh-ov-card" onclick="showSH('beratung',this)">
+      <div class="sh-ov-icon"><i class="ti ti-message-circle"></i></div>
+      <div class="sh-ov-name">Beratungsstellen</div>
+      <div class="sh-ov-role">Bieten Einzelberatung, Gruppentherapie und Peer-Support bei psychosozialen Problemen</div>
+      <div class="sh-ov-badges"><span class="badge b-s">Psyche</span><span class="badge b-i">Isolation</span></div>
+      <div class="sh-occ"><div class="occ-dot occ-open"></div><span style="color:var(--grn600);font-size:11px">Raum für neue Services</span></div>
+    </div>
+    <div class="sh-ov-card" onclick="showSH('politik',this)">
+      <div class="sh-ov-icon"><i class="ti ti-landmark"></i></div>
+      <div class="sh-ov-name">Politik & Verwaltung</div>
+      <div class="sh-ov-role">Steuern BAföG-Reform, Wohnbauförderung und strukturelle Rahmenbedingungen für Studierende</div>
+      <div class="sh-ov-badges"><span class="badge b-f">Finanzen</span><span class="badge b-h">Housing</span></div>
+      <div class="sh-occ"><div class="occ-dot occ-open"></div><span style="color:var(--grn600);font-size:11px">Raum für neue Services</span></div>
+    </div>
+  </div>
+
+  <!-- color legend — below widgets -->
+  <div style="display:flex;gap:20px;flex-wrap:wrap;padding:12px 0 24px;font-size:12px;color:var(--muted);border-bottom:0.5px solid var(--border);margin-bottom:24px">
+    <span style="display:flex;align-items:center;gap:6px"><span style="width:8px;height:8px;border-radius:50%;background:var(--amb400);display:inline-block"></span>Aktiv bearbeitet — bestehende Zuständigkeit</span>
+    <span style="display:flex;align-items:center;gap:6px"><span style="width:8px;height:8px;border-radius:50%;background:var(--grn400);display:inline-block"></span>Raum für neue Services — strukturelle Lücke erkannt</span>
+    <span style="display:flex;align-items:center;gap:6px"><span style="width:8px;height:8px;border-radius:50%;background:var(--red400);display:inline-block"></span>Überlastet — optimierbar durch neuen Service</span>
+  </div>
+
+  <!-- Detail Panel -->
+  <div class="sh-detail-panel" id="sh-detail"></div>
+</div>
+
+<!-- AI TOOL -->
+<section class="ai-section" id="ai">
+  <div class="ai-inner">
+
+    <div class="sec-label">Service Innovation Output</div>
+    <h2 class="sec-title">Du siehst eine Lücke? Hier wird daraus eine Idee.</h2>
+    <p class="sec-body" style="margin-bottom:28px;">Beschreib ein Problem, das du bei Studierenden beobachtest — oder eine Lücke, die noch niemand schließt. Service Sonar analysiert es, ordnet es einem systemischen Cluster zu und schlägt einen konkreten neuen Service vor.</p>
+    <div class="ai-box">
+      <div class="ai-box-label">Lücke oder Signal eingeben:</div>
+      <div class="ai-row">
+        <input class="ai-input" id="sig-in" placeholder="z.B. Keine Anlaufstelle für Behördenfragen auf Englisch...">
+        <button class="ai-go" id="ai-btn" onclick="gen()">Analysieren ↗</button>
+      </div>
+      <div class="ai-suggestions">
+        <button class="sugg-btn" onclick="fill('Beratungsstellen sind überlastet — Wartezeiten bis 6 Wochen')">Beratung überlastet</button>
+        <button class="sugg-btn" onclick="fill('Keine einheitliche Anlaufstelle für Behördenfragen auf Englisch')">Behörden & Sprache</button>
+        <button class="sugg-btn" onclick="fill('Erstsemester fühlen sich nach der Einführungswoche allein gelassen')">Erstsemester-Isolation</button>
+        <button class="sugg-btn" onclick="fill('BAföG-Anträge scheitern oft an bürokratischen Hürden, nicht am Anspruch')">BAföG-Hürden</button>
+      </div>
+      <div class="ai-output" id="ai-out"></div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div>
+    <div style="font-size:14px;color:#aaa;font-weight:500;margin-bottom:2px;">Service Sonar</div>
+    <div class="footer-txt">FAU Nürnberg · Seminar KI-gestützte Service Innovation · 2026</div>
+  </div>
+  <div class="footer-links">
+    <a href="#pipeline">Pipeline</a>
+    <a href="#dashboard">Signale</a>
+    <a href="#cluster">Clustering</a>
+    <a href="#stakeholder">Stakeholder</a>
+    <a href="#ai">KI-Tool</a>
+  </div>
+</footer>
+
+<script>
+// ── SPARKLINE HELPER ──
+function drawSpark(id, data, color, filled) {
+  const canvas = document.getElementById(id);
+  if (!canvas) return;
+  const dpr = window.devicePixelRatio || 1;
+  canvas.width = canvas.offsetWidth * dpr;
+  canvas.height = canvas.offsetHeight * dpr;
+  const ctx = canvas.getContext('2d');
+  ctx.scale(dpr, dpr);
+  const w = canvas.offsetWidth, h = canvas.offsetHeight;
+  const min = Math.min(...data), max = Math.max(...data);
+  const range = max - min || 1;
+  const pts = data.map((v,i) => [i/(data.length-1)*w, h - ((v-min)/range)*(h-6)-3]);
+  ctx.beginPath();
+  pts.forEach(([x,y],i) => i===0 ? ctx.moveTo(x,y) : ctx.lineTo(x,y));
+  ctx.strokeStyle = color; ctx.lineWidth = 1.5; ctx.stroke();
+  if (filled) {
+    ctx.lineTo(w, h); ctx.lineTo(0, h); ctx.closePath();
+    ctx.fillStyle = color + '22'; ctx.fill();
+  }
+}
+
+const sparkData = {
+  housing:     [38,42,45,50,55,62,70,78,82],
+  psyche:      [35,38,40,45,52,60,66,72,74],
+  finanzen:    [40,42,44,46,50,53,56,59,61],
+  sprache:     [44,45,46,47,46,47,48,48,48],
+  isolation:   [28,29,30,30,31,32,33,34,35],
+  buerokratie: [0,0,0,5,10,15,20,24,29]
+};
+const sparkColors = {
+  housing:'#E24B4A', psyche:'#E24B4A', finanzen:'#EF9F27',
+  sprache:'#EF9F27', isolation:'#639922', buerokratie:'#AFA9EC'
+};
+// cluster sparklines (3-month weekly points)
+const clsData = {
+  housing:[120,145,160,180,200,240,280,320,340],
+  psyche:[100,120,140,155,175,200,240,270,290],
+  finanzen:[140,148,155,160,170,185,198,208,215],
+  integration:[90,95,105,115,125,140,155,165,180],
+  isolation:[60,65,68,70,75,88,100,120,140],
+  buerokratie:[0,0,0,10,20,35,55,75,95]
+};
+
+window.addEventListener('load', () => {
+  Object.keys(sparkData).forEach(k => {
+    drawSpark('sp-'+k, sparkData[k], sparkColors[k], true);
+  });
+  showSH('hochschule', document.querySelector('.sh-ov-card'));
+});
+
+// ── MODAL DATA ──
+const modalData = {
+  housing: {
+    label:'Problemcluster · Kritisch',
+    title:'Wohnungsstress & Housing-Unsicherheit',
+    data: sparkData.housing, color:'#E24B4A',
+    // raw weekly mention counts (not %)
+    rawCounts:[18,22,26,31,38,48,60,72,82],
+    detectWeek: 1, // index when system first flagged
+    detectText:'Service Sonar hat dieses Signal erstmals in Woche 2 (Mitte März) als signifikant markiert — ab 20 Erwähnungen/Woche.',
+    obs:'Über 340 Beiträge in 3 Monaten zeigen: Mietanstieg, WG-Konflikte und Angst vor Obdachlosigkeit nehmen deutlich zu. Besonders internationale Studierende sind betroffen — Sprachbarriere und fehlende Netzwerke verstärken den Stress.',
+    trends:[['Mietanstieg-Erwähnungen','78%','#E24B4A'],['WG-Konflikte','55%','#EF9F27'],['Obdachlosigkeitsangst','32%','#EF9F27']],
+    stakeholders:['Studentenwerk','Sozialamt','Int. Office','Hochschule'],
+    siName:'"Housing Navigation Assistant"',
+    siDesc:'KI-gestützter Wegweiser für Studierende in Wohnungskrise: navigiert durch Behörden, zeigt freie Wohnheimplätze, verbindet mit Beratung — mehrsprachig verfügbar.',
+    siWho:'Studentenwerk + Int. Office'
+  },
+  psyche: {
+    label:'Problemcluster · Kritisch',
+    title:'Psychische Belastung & Burnout',
+    data: sparkData.psyche, color:'#E24B4A',
+    rawCounts:[14,17,20,26,34,44,56,65,74],
+    detectWeek: 2,
+    detectText:'Erstmals erkannt in Woche 3 (Ende März) — Burnout-Cluster überschritt Schwellenwert von 25 Erwähnungen/Woche.',
+    obs:'Burnout, Prüfungsangst und Erschöpfung steigen besonders im Sommersemester. Der Cluster überlappt mit Isolation — Studierende mit wenig sozialen Kontakten berichten signifikant häufiger von psychischen Belastungen.',
+    trends:[['Burnout-Muster','70%','#E24B4A'],['Prüfungsangst','60%','#EF9F27'],['Überforderung gesamt','55%','#EF9F27']],
+    stakeholders:['Uni Beratung','Hochschulen','Sozialdienste'],
+    siName:'"Peer Support Network"',
+    siDesc:'Strukturiertes Peer-Mentoring-System: verbindet Erstsemester mit höhersemestrigen Studierenden — niedrigschwellig, digital, psychologisch begleitet.',
+    siWho:'Uni Beratung + Hochschulen'
+  },
+  finanzen: {
+    label:'Problemcluster · Hoch',
+    title:'Finanzstress & BAföG-Probleme',
+    data: sparkData.finanzen, color:'#EF9F27',
+    rawCounts:[28,30,32,34,38,44,50,56,61],
+    detectWeek: 0,
+    detectText:'Signal seit Beobachtungsbeginn (März) aktiv — persistentes Basisniveau mit steigendem Trend seit April.',
+    obs:'BAföG-Ablehnungen und steigende Lebenshaltungskosten erzeugen Existenzangst. Viele Studierende berichten, mehrere Nebenjobs zu haben — auf Kosten des Studiums und der Gesundheit.',
+    trends:[['BAföG-Probleme','61%','#EF9F27'],['Schulden-Erwähnungen','38%','#EF9F27'],['Jobzwang','44%','#EF9F27']],
+    stakeholders:['Studierendenwerke','Sozialamt','Politik'],
+    siName:'"Finanzkompass Student"',
+    siDesc:'Digitale Erstberatung zu BAföG, Stipendien und Nothilfefonds — automatisierte Vorprüfung der Anspruchsberechtigung, direkte Weiterleitung zu zuständigen Stellen.',
+    siWho:'Studierendenwerke + Sozialamt'
+  },
+  sprache: {
+    label:'Problemcluster · Hoch',
+    title:'Sprachbarrieren & Behördenstress',
+    data: sparkData.sprache, color:'#EF9F27',
+    rawCounts:[30,31,32,32,33,34,35,36,48],
+    detectWeek: 0,
+    detectText:'Stabiles Signal mit plötzlichem Anstieg in Woche 9 (Anfang Mai) — möglicherweise durch Semesterbeginn-Bürokratie ausgelöst.',
+    obs:'Internationale Studierende berichten häufig von Überforderung durch deutsche Bürokratie. Formulare, Fristen und fehlende englischsprachige Unterstützung sind die häufigsten Nennungen.',
+    trends:[['Bürokratie-Überforderung','55%','#EF9F27'],['Formularproblem','48%','#EF9F27'],['Sprachbarriere Behörde','42%','#EF9F27']],
+    stakeholders:['Int. Office','Beratungsstellen','Hochschulen'],
+    siName:'"BürokratieBot"',
+    siDesc:'Mehrsprachiger KI-Assistent durch deutsche Behördenprozesse: erklärt Formulare, trackt Fristen, übersetzt ins Deutsche — 24/7 verfügbar.',
+    siWho:'Int. Office'
+  },
+  isolation: {
+    label:'Problemcluster · Mittel',
+    title:'Soziale Isolation & Einsamkeit',
+    data: sparkData.isolation, color:'#639922',
+    rawCounts:[14,15,16,17,18,21,24,28,35],
+    detectWeek: 4,
+    detectText:'Erstmals als eigenständiger Cluster erkannt in Woche 5 (Mitte April) — zuvor Teil des Psyche-Clusters.',
+    obs:'Besonders Erstsemester und internationale Studierende berichten von Einsamkeit und fehlenden sozialen Netzwerken. Eng verbunden mit psychischer Belastung.',
+    trends:[['Einsamkeit-Erwähnungen','40%','#639922'],['Fehlende Netzwerke','35%','#EF9F27'],['Erstsemester-Cluster','28%','#639922']],
+    stakeholders:['Uni Beratung','Hochschulen'],
+    siName:'"Campus Connect"',
+    siDesc:'Digitale Plattform zur niedrigschwelligen Vernetzung von Studierenden nach Interessen, Semester und Wohnort — mit wöchentlichen moderierten Treffen.',
+    siWho:'Hochschulen + Studierendenwerke'
+  },
+  buerokratie: {
+    label:'Emerging Signal · Neu erkannt',
+    title:'Behörden-Überforderung',
+    data: sparkData.buerokratie, color:'#AFA9EC',
+    rawCounts:[0,0,0,4,8,12,18,23,29],
+    detectWeek: 3,
+    detectText:'Service Sonar hat dieses Emerging Signal erstmals in Woche 4 (Anfang April) identifiziert — ab 5 Erwähnungen/Woche gilt es als aktives Signal.',
+    obs:'Seit April sichtbares neues Signal: Studierende — besonders internationale — berichten von vollständiger Orientierungslosigkeit bei deutschen Behördenprozessen. Das Signal ist noch schwach, aber wachsend.',
+    trends:[['Orientierungslosigkeit','29%','#AFA9EC'],['Fristen-Panik','22%','#EF9F27'],['Formulare unverständlich','18%','#AFA9EC']],
+    stakeholders:['Int. Office','Hochschulen'],
+    siName:'"Orientation Hub"',
+    siDesc:'Zentraler digitaler Anlaufpunkt für Erstsemester: führt durch alle relevanten Behördenschritte von Anmeldung bis BAföG — mehrsprachig, KI-gestützt.',
+    siWho:'Hochschulen + Int. Office'
+  }
+};
+
+function openModal(key) {
+  const d = modalData[key];
+  document.getElementById('m-label').textContent = d.label;
+  document.getElementById('m-title').textContent = d.title;
+  document.getElementById('m-obs').textContent = d.obs;
+  document.getElementById('m-si-name').textContent = d.siName;
+  document.getElementById('m-si-desc').textContent = d.siDesc;
+  document.getElementById('m-si-who').textContent = d.siWho;
+  document.getElementById('m-detect-txt').textContent = d.detectText;
+  document.getElementById('m-legend-line').style.background = d.color;
+  document.getElementById('m-sh').innerHTML = d.stakeholders.map(s=>`<span class="modal-sh">${s}</span>`).join('');
+  document.getElementById('m-trend-rows').innerHTML = d.trends.map(([l,v,c])=>`
+    <div class="modal-trend-row">
+      <span class="modal-trend-lbl">${l}</span>
+      <div class="modal-trend-bar-wrap"><div class="modal-trend-bar" style="width:${v};background:${c}"></div></div>
+      <span class="modal-trend-pct">${v}</span>
+    </div>`).join('');
+  document.getElementById('modal-overlay').classList.add('open');
+
+  setTimeout(() => {
+    const c = document.getElementById('m-chart');
+    if (!c) return;
+    const dpr = window.devicePixelRatio || 1;
+    c.width = c.offsetWidth * dpr;
+    c.height = c.offsetHeight * dpr;
+    const ctx = c.getContext('2d');
+    ctx.scale(dpr, dpr);
+    const data = d.rawCounts;
+    const W = c.offsetWidth, H = c.offsetHeight;
+    const min = 0, max = Math.ceil(Math.max(...data) * 1.1);
+    const toY = v => H - ((v - min) / (max - min)) * (H - 8) - 4;
+    const toX = i => (i / (data.length - 1)) * W;
+
+    // grid lines
+    ctx.strokeStyle = '#f0eeff'; ctx.lineWidth = 0.5;
+    [0, 0.25, 0.5, 0.75, 1].forEach(f => {
+      const y = toY(min + f * (max - min));
+      ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke();
+    });
+
+    // fill
+    const pts = data.map((v,i)=>[toX(i), toY(v)]);
+    ctx.beginPath();
+    pts.forEach(([x,y],i) => i===0 ? ctx.moveTo(x,y) : ctx.lineTo(x,y));
+    ctx.lineTo(W,H); ctx.lineTo(0,H); ctx.closePath();
+    ctx.fillStyle = d.color + '18'; ctx.fill();
+
+    // line
+    ctx.beginPath();
+    pts.forEach(([x,y],i) => i===0 ? ctx.moveTo(x,y) : ctx.lineTo(x,y));
+    ctx.strokeStyle = d.color; ctx.lineWidth = 2; ctx.stroke();
+
+    // detection point
+    const di = d.detectWeek;
+    const [dx, dy] = [toX(di), toY(data[di])];
+    ctx.beginPath(); ctx.arc(dx, dy, 5, 0, Math.PI*2);
+    ctx.fillStyle = '#534AB7'; ctx.fill();
+    ctx.strokeStyle = 'white'; ctx.lineWidth = 2; ctx.stroke();
+
+    // y-axis labels
+    const yaxis = document.getElementById('m-yaxis');
+    yaxis.innerHTML = '';
+    [1, 0.75, 0.5, 0.25, 0].forEach(f => {
+      const val = Math.round(min + f * (max - min));
+      const span = document.createElement('span');
+      span.className = 'yax-lbl';
+      span.textContent = val;
+      yaxis.appendChild(span);
+    });
+  }, 50);
+}
+
+function closeModal(e) {
+  if (!e || e.target === document.getElementById('modal-overlay'))
+    document.getElementById('modal-overlay').classList.remove('open');
+}
+
+// ── STAKEHOLDER DATA ──
+const shData = {
+  hochschule: {
+    icon:'ti-building', name:'Hochschulen', role:'Strukturelle Früherkennung & Maßnahmen',
+    status:'taken',
+    problems:[
+      {name:'Psychische Belastung', color:'#E24B4A', solution:'Psychologische Beratungsstelle ausgebaut', why:'Direkter Zugang zu Studierenden — aber stark überlastet, Wartezeiten bis 6 Wochen', optimize:'KI-gestütztes Ersttriage-Tool könnte Wartezeiten halbieren: schnelle Einschätzung, ob Sofortberatung oder Gruppenangebot passender ist.'},
+      {name:'Soziale Isolation', color:'#639922', solution:'Onboarding-Programme für Erstsemester', why:'Struktureller Zugang zu allen Erstsemestern — aber Programm endet nach Woche 1', open:true, openDesc:'Kontinuierliches Peer-Netzwerk nach der Einführungswoche fehlt — strukturierte Begleitung über das erste Semester wäre möglich.'}
+    ],
+    openArea:'Behörden-Überforderung noch nicht abgedeckt — strukturierte Orientierungshilfe für Formulare und Fristen fehlt komplett.',
+    aiPrompt:'Hochschulen haben kein Angebot für Behörden-Orientierung: Studierende wissen nicht, wo sie Formulare einreichen oder Fristen nachverfolgen können'
+  },
+  studentenwerk: {
+    icon:'ti-building-community', name:'Studierendenwerke', role:'Wohnen, Mensa, Finanzhilfen',
+    status:'taken',
+    problems:[
+      {name:'Wohnungsstress', color:'#E24B4A', solution:'Wohnheimplätze & Vermittlung', why:'Direkte Zuständigkeit für studentisches Wohnen — aber stark überlastet, Wartelisten über 6 Monate', optimize:'Smarte Wartelisten-Plattform mit Priorisierung nach Vulnerabilität statt reiner Reihenfolge könnte die Verteilung gerechter machen.'},
+      {name:'Finanzstress', color:'#EF9F27', solution:'BAföG-Beratung & Nothilfefonds', why:'Offizielle Anlaufstelle — aber stark überlastet, Beratungskapazität reicht nicht aus', optimize:'Automatisierte Vorprüfung der BAföG-Berechtigung: Studierende wissen vor dem Gespräch, ob und wie viel sie bekommen könnten.'}
+    ],
+    openArea:'Digitale Self-Service-Tools fehlen — alles läuft über persönliche Termine, obwohl viele Fälle standardisierbar wären.',
+    aiPrompt:'Studierendenwerke sind überlastet: BAföG-Beratung und Wohnheimanmeldung könnten durch digitale Vorprüfung und Self-Service entlastet werden'
+  },
+  sozial: {
+    icon:'ti-heart', name:'Sozialdienste', role:'Krisenintervention & Ressourcenplanung',
+    status:'taken',
+    problems:[
+      {name:'Psychische Krisen', color:'#E24B4A', solution:'Krisentelefon & akute Intervention', why:'Zuständigkeit für akute Notfälle — aber reaktiv, keine Prävention, stark überlastet', optimize:'Frühwarnsystem auf Basis von Weak Signals: Intervention bevor die Krise eskaliert, nicht erst wenn Studierende den Notfall melden.'},
+      {name:'Soziale Isolation', color:'#639922', solution:'Gruppenangebote & Sozialberatung', why:'Langfristige Begleitung — aber nur für Studierende, die aktiv Hilfe suchen', open:true, openDesc:'Proaktive Outreach-Angebote für isolierte Studierende fehlen — digitale Früherkennung könnte helfen, Betroffene zu finden bevor sie sich melden.'}
+    ],
+    openArea:'Präventive Angebote auf Basis von Signaldaten noch nicht etabliert — das ist der größte offene Bereich.',
+    aiPrompt:'Sozialdienste agieren nur reaktiv: wie könnte ein präventiver Frühwarn-Service auf Basis von Schwachen Signalen aussehen?'
+  },
+  intoffice: {
+    icon:'ti-world', name:'Int. Office', role:'Betreuung internationaler Studierender',
+    status:'taken',
+    problems:[
+      {name:'Sprachbarrieren', color:'#EF9F27', solution:'Englischsprachige Beratung & Buddy-System', why:'Direkter Zugang zur Zielgruppe — aber Kapazität für 1:1-Beratung begrenzt, stark überlastet', optimize:'KI-Mehrsprachassistent für Behördenfragen: 24/7 verfügbar, skalierbar, entlastet das Team für komplexe Fälle.'},
+      {name:'Housing int. Studierender', color:'#E24B4A', solution:'Spezielle Wohnheimplätze & Orientierung', why:'Int. Studierende haben weniger Netzwerke — aber Angebot reicht nicht für alle', open:true, openDesc:'Gezielte Wohnvermittlung speziell für Neuankömmlinge ohne lokales Netzwerk fehlt — eine digitale Matching-Plattform wäre ein naheliegender nächster Schritt.'}
+    ],
+    openArea:'Behörden-Navigation fehlt vollständig — mehrsprachiger digitaler Assistent für Formulare und Fristen wäre der naheliegendste neue Service.',
+    aiPrompt:'Int. Office ist überlastet: ein KI-gestützter mehrsprachiger Assistent für Behördenfragen und Wohnungssuche für internationale Studierende'
+  },
+  beratung: {
+    icon:'ti-message-circle', name:'Beratungsstellen', role:'Psychosoziale Beratung & neue Services',
+    status:'open',
+    problems:[
+      {name:'Psychische Belastung', color:'#E24B4A', solution:'Einzelberatung & Gruppentherapie', why:'Kernkompetenz — aber stark überlastet, Wartezeiten bis 6 Wochen', optimize:'Peer-Support-Netzwerk als Vorstufe zur Fachberatung: niedrigschwellig, sofort verfügbar, entlastet die Fachkräfte für schwere Fälle.'},
+      {name:'Soziale Isolation', color:'#639922', solution:'Gruppenangebote, Peer-Support', why:'Gutes Angebot — aber nur für Studierende, die es aktiv finden', open:true, openDesc:'Digitale niedrigschwellige Ansprache von isolierten Studierenden fehlt — ein präventiver Erstkontakt-Service könnte die Reichweite deutlich erhöhen.'}
+    ],
+    openArea:'Digitale präventive Angebote für Erstsemester offen — hier entsteht der Raum für einen völlig neuen Service.',
+    aiPrompt:'Beratungsstellen sind überlastet und erreichen nur Studierende, die aktiv Hilfe suchen: wie könnte ein niedrigschwelliger digitaler Peer-Support-Service Erstsemester präventiv erreichen?'
+  },
+  politik: {
+    icon:'ti-landmark', name:'Politik & Verwaltung', role:'Strukturelle Lösungen & Frühindikatoren',
+    status:'open',
+    problems:[
+      {name:'Finanzstress systemisch', color:'#EF9F27', solution:'BAföG-Reform, politische Diskussion', why:'Nur politische Maßnahmen können strukturellen Finanzstress dauerhaft lösen', open:true, openDesc:'Echtzeit-Signaldaten könnten politische Entscheidungen über BAföG-Anpassungen informieren — bevor Probleme zur Krise werden.'},
+      {name:'Housing-Markt', color:'#E24B4A', solution:'Wohnbauförderung & Mietpreisbremse', why:'Strukturelles Problem erfordert politische Steuerung — langfristig'}
+    ],
+    openArea:'Schwache Signale als gesellschaftliche Frühindikatoren noch nicht in politische Entscheidungen integriert — Service Sonar könnte diese Brücke bauen.',
+    aiPrompt:'Politik hat keinen Zugang zu Echtzeit-Schwachen-Signalen aus der Studierendenschaft: wie könnte ein Policy-Intelligence-Dashboard politische Entscheidungen informieren?'
+  }
+};
+
+function showSH(key, el) {
+  document.querySelectorAll('.sh-ov-card').forEach(c=>c.classList.remove('active'));
+  if(el) el.classList.add('active');
+  const d = shData[key];
+  const isOpen = d.status === 'open';
+  const statusHtml = isOpen
+    ? `<div style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--grn600);margin-bottom:20px"><div style="width:8px;height:8px;border-radius:50%;background:var(--grn400)"></div>Raum für neue Services vorhanden</div>`
+    : `<div style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--amb600);margin-bottom:20px"><div style="width:8px;height:8px;border-radius:50%;background:var(--amb400)"></div>Wird aktiv bearbeitet</div>`;
+
+  // left column items
+  const leftItems = d.problems.map(p => {
+    const overloaded = p.why && p.why.toLowerCase().includes('überlastet');
+    const hasOpen = p.open;
+    const dotColor = overloaded ? '#E24B4A' : (hasOpen ? '#639922' : '#EF9F27');
+    return `
+      <div style="padding:14px 0;border-bottom:0.5px solid var(--border)">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+          <div style="width:8px;height:8px;border-radius:50%;background:${dotColor};flex-shrink:0"></div>
+          <div style="font-size:13px;font-weight:500;color:var(--text)">${p.name}</div>
+          ${overloaded ? `<span style="font-size:10px;background:var(--red50);color:var(--red600);padding:1px 7px;border-radius:20px;font-weight:500;flex-shrink:0">überlastet</span>` : ''}
+          ${hasOpen ? `<span style="font-size:10px;background:var(--grn50);color:var(--grn600);padding:1px 7px;border-radius:20px;font-weight:500;flex-shrink:0">offen</span>` : ''}
+        </div>
+        <div style="font-size:12px;color:var(--muted);padding-left:16px;margin-bottom:3px">${p.solution}</div>
+        <div style="font-size:11px;color:var(--p600);padding-left:16px;font-style:italic">${p.why}</div>
+      </div>`;
+  }).join('');
+
+  // right column: one block per overloaded problem (red), one per open problem (green), one neutral "Neuer Service"
+  let rightItems = '';
+  d.problems.forEach(p => {
+    const overloaded = p.why && p.why.toLowerCase().includes('überlastet');
+    if (overloaded && p.optimize) {
+      rightItems += `
+        <div style="padding:12px 14px;background:#fff8f8;border-radius:var(--rmd);border:0.5px solid #fddcdc;margin-bottom:10px">
+          <div style="font-size:10px;font-weight:500;text-transform:uppercase;letter-spacing:.05em;color:var(--red600);margin-bottom:6px">Optimierungspotenzial · ${p.name}</div>
+          <div style="font-size:13px;color:var(--text);line-height:1.55">${p.optimize}</div>
+        </div>`;
+    }
+    if (p.open && p.openDesc) {
+      rightItems += `
+        <div style="padding:12px 14px;background:var(--grn50);border-radius:var(--rmd);border:0.5px solid #c2e09a;margin-bottom:10px">
+          <div style="font-size:10px;font-weight:500;text-transform:uppercase;letter-spacing:.05em;color:var(--grn600);margin-bottom:6px">Schließungspotenzial · ${p.name}</div>
+          <div style="font-size:13px;color:var(--text);line-height:1.55">${p.openDesc}</div>
+        </div>`;
+    }
+  });
+  if (d.openArea) {
+    rightItems += `
+      <div style="padding:12px 14px;background:#f8f8f8;border-radius:var(--rmd);border:0.5px solid #e0dfe8;margin-bottom:0">
+        <div style="font-size:10px;font-weight:500;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);margin-bottom:6px">Neuer Service möglich</div>
+        <div style="font-size:13px;color:var(--text);line-height:1.55">${d.openArea}</div>
+      </div>`;
+  }
+
+  document.getElementById('sh-detail').innerHTML = `
+    <div style="display:flex;align-items:center;gap:14px;margin-bottom:16px">
+      <div style="width:44px;height:44px;border-radius:12px;background:var(--p50);display:grid;place-items:center;font-size:22px;color:var(--p600);flex-shrink:0"><i class="ti ${d.icon}"></i></div>
+      <div><div style="font-size:18px;font-weight:500">${d.name}</div><div style="font-size:13px;color:var(--muted)">${d.role}</div></div>
+    </div>
+    ${statusHtml}
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:0">
+      <div style="padding-right:32px">
+        <div style="font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:.06em;color:var(--light);margin-bottom:2px">Bearbeitete Probleme & Lösungen</div>
+        ${leftItems}
+      </div>
+      <div style="border-left:0.5px solid var(--border);padding-left:32px">
+        <div style="font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:.06em;color:var(--light);margin-bottom:10px">Innovationspotenzial</div>
+        ${rightItems}
+      </div>
+    </div>`;
+}
+
+async function loadPipelineData() {
+  const statusRes = await fetch("http://127.0.0.1:8000/api/status");
+  const status = await statusRes.json();
+
+  const total =
+    status.cleaned +
+    status.analyzed +
+    status.human_review +
+    status.rejected;
+
+  document.getElementById("source-count").textContent =
+    `${total} Quellen verarbeitet · ${status.analyzed} mit LLM analysiert`;
+
+  const clustersRes = await fetch("http://127.0.0.1:8000/api/clusters");
+  const clusters = await clustersRes.json();
+
+  const cards = document.querySelectorAll(".prob-card");
+  const analyzedTotal = clusters.reduce((sum, c) => sum + c.count, 0);
+
+  clusters.forEach((cluster, index) => {
+    const card = cards[index];
+    if (!card) return;
+
+    const percent = analyzedTotal
+      ? Math.round((cluster.count / analyzedTotal) * 100)
+      : 0;
+
+    card.querySelector(".pc-name").textContent = cluster.cluster;
+    card.querySelector(".pc-pct").textContent = `${percent}%`;
+    card.querySelector(".pc-delta").textContent =
+      `${cluster.count} LLM-analysierte Beiträge`;
+  });
+}
+
+loadPipelineData();
+</script>
+</body>
+</html>
