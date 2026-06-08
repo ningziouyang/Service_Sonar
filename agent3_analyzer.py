@@ -58,7 +58,7 @@ class Agent3Analyzer:
 
         except Exception as e:
             print(f"[Agent 3 ERROR] API-Aufruf fehlgeschlagen: {e}")
-            return {"error": "API Timeout", "problem_cluster": "Unbekannt"}
+            return None
 
     def run(self):
         """
@@ -84,7 +84,12 @@ class Agent3Analyzer:
             # 🚀 Hier rufen wir das echte KI-Modell auf!
             analysis_dict = self._call_llm_api(cleaned_content)
             
-            # Füge Metadaten hinzu (damit man später sieht, wie es analysiert wurde)
+            # Falls die API fehlgeschlagen ist → Beitrag nicht weiterverarbeiten
+            if analysis_dict is None:
+                print(f"[Agent 3] ID {db_id} bleibt status=1 wegen API-Fehler.")
+                continue
+
+             # Füge Metadaten hinzu
             analysis_dict["analysis_method"] = f"llm_api ({self.model_name})"
             analysis_dict["weak_signal_relevance"] = analysis_dict.get("urgency") in ["Mittel", "Hoch"]
             
