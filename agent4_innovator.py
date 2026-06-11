@@ -1,105 +1,544 @@
-import os
+import argparse
+import hashlib
 import json
+import os
 import sqlite3
-from openai import OpenAI
-from dotenv import load_dotenv
+import time
+from collections import Counter, defaultdict
+from datetime import datetime, timezone
 
-# Lädt die versteckten Umgebungsvariablen aus der .env-Datei (z.B. GROQ_API_KEY)
+from dotenv import load_dotenv
+from openai import OpenAI
+
+
 load_dotenv()
 
+
 class Agent4Innovator:
+    """
+    LLM-only innovation generator.
+
+    The final report is always produced by an LLM. To survive Groq limits, this
+    agent compresses Agent 3 outputs before the call, caches reports by source
+    signature, retries 429/transient failures, and can fall back to additional
+    OpenAI-compatible providers configured through environment variables.
+    """
+
+    REQUIRED_INNOVATION_FIELDS = ("cluster", "opportunity", "solution", "target", "stakeholder")
+
     def __init__(self, db_file="service_sonar.db"):
         self.db_file = db_file
-        self.api_key = os.getenv("GROQ_API_KEY")
-        
-        if not self.api_key:
-            raise ValueError("[WARNUNG] GROQ_API_KEY fehlt in der .env Datei!")
-            
-        # Initialisierung des OpenAI-Clients, umgeleitet auf die Groq-Infrastruktur
-        self.client = OpenAI(
-            base_url="https://api.groq.com/openai/v1",
-            api_key=self.api_key
-        )
+        self.max_retries = int(os.getenv("AGENT4_MAX_RETRIES", "3"))
+        self.retry_base_seconds = float(os.getenv("AGENT4_RETRY_BASE_SECONDS", "4"))
+        self.max_retry_sleep = float(os.getenv("AGENT4_MAX_RETRY_SLEEP", "45"))
+        self.temperature = float(os.getenv("AGENT4_TEMPERATURE", "0.65"))
+        self.max_examples = int(os.getenv("AGENT4_MAX_EXAMPLES", "6"))
+        self.max_example_chars = int(os.getenv("AGENT4_MAX_EXAMPLE_CHARS", "420"))
+        self.providers = self._load_providers()
+
+        if not self.providers:
+            raise ValueError(
+                "[Agent 4 ERROR] No LLM provider configured. Add GROQ_API_KEY, "
+                "OPENAI_API_KEY, OPENROUTER_API_KEY, DEEPSEEK_API_KEY, or enable "
+                "local Ollama with OLLAMA_ENABLED=true."
+            )
+
         self._init_report_table()
 
+    def _load_providers(self):
+        provider_defs = {
+            "groq": {
+                "api_key": os.getenv("GROQ_API_KEY"),
+                "base_url": os.getenv("GROQ_BASE_URL", "https://api.groq.com/openai/v1"),
+                "model": os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile"),
+            },
+            "openai": {
+                "api_key": os.getenv("OPENAI_API_KEY"),
+                "base_url": os.getenv("OPENAI_BASE_URL"),
+                "model": os.getenv("OPENAI_MODEL", "gpt-4o-mini"),
+            },
+            "openrouter": {
+                "api_key": os.getenv("OPENROUTER_API_KEY"),
+                "base_url": os.getenv("OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1"),
+                "model": os.getenv("OPENROUTER_MODEL", "openai/gpt-4o-mini"),
+            },
+            "deepseek": {
+                "api_key": os.getenv("DEEPSEEK_API_KEY"),
+                "base_url": os.getenv("DEEPSEEK_BASE_URL", "https://api.deepseek.com"),
+                "model": os.getenv("DEEPSEEK_MODEL", "deepseek-chat"),
+            },
+            "ollama": {
+                "enabled": self._env_enabled("OLLAMA_ENABLED") or bool(os.getenv("OLLAMA_MODEL")),
+                "api_key": os.getenv("OLLAMA_API_KEY", "ollama"),
+                "base_url": os.getenv("OLLAMA_BASE_URL", "http://127.0.0.1:11434/v1"),
+                "model": os.getenv("OLLAMA_MODEL", "qwen2.5:7b-instruct"),
+            },
+        }
+
+        order = os.getenv("AGENT4_PROVIDER_ORDER", "groq,openai,openrouter,deepseek,ollama")
+        providers = []
+        for name in [item.strip().lower() for item in order.split(",") if item.strip()]:
+            config = provider_defs.get(name)
+            if not config or not config.get("enabled", True) or not config["api_key"]:
+                continue
+
+            client_kwargs = {"api_key": config["api_key"]}
+            if config["base_url"]:
+                client_kwargs["base_url"] = config["base_url"]
+
+            providers.append(
+                {
+                    "name": name,
+                    "model": config["model"],
+                    "client": OpenAI(**client_kwargs),
+                }
+            )
+        return providers
+
+    def _env_enabled(self, name):
+        return os.getenv(name, "").strip().lower() in {"1", "true", "yes", "on"}
+
     def _init_report_table(self):
-        """Erstellt eine neue Tabelle exklusiv für die generierten Dashboard-Insights."""
         conn = sqlite3.connect(self.db_file)
-        conn.execute("""
+        conn.execute(
+            """
             CREATE TABLE IF NOT EXISTS system_reports (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 report_json TEXT
             )
-        """)
+            """
+        )
         conn.commit()
         conn.close()
 
-    def run(self):
-        """
-        Agent 4 Interface: Aggregation verifizierter Daten und Generierung von Lösungsansätzen.
-        """
-        print("\n---------------------------------------------------------------------")
-        print("[Agent 4] Starte Innovations-Generator (Llama 3.3 via Groq)...")
-        print("---------------------------------------------------------------------")
-        
-        conn = sqlite3.connect(self.db_file)
-        cursor = conn.cursor()
-        
-        # Hole alle verifizierten und von Agent 3 analysierten Datensätze (status=2)
-        cursor.execute("SELECT cleaned_content, analysis_json FROM forum_posts WHERE status = 2")
-        records = cursor.fetchall()
+    def _load_analyzed_records(self, cursor):
+        cursor.execute(
+            """
+            SELECT id, cleaned_content, analysis_json
+            FROM forum_posts
+            WHERE status = 2 AND analysis_json IS NOT NULL
+            ORDER BY id ASC
+            """
+        )
+        return cursor.fetchall()
 
-        if not records:
-            print("[Agent 4 INFO] Keine ausreichenden Daten (status=2) für die Innovationsgenerierung vorhanden.")
-            conn.close()
-            return
-
-        # 1. Empirischen Kontext für das LLM aufbauen
-        print(f"[Agent 4] Aggregiere {len(records)} Fallbeispiele für die KI-Inferenz...")
-        context_data = []
-        for text, j_str in records:
-            context_data.append(f"Text: {text}\nAnalyse: {j_str}")
-        
-        # Begrenzung der Zeichenlänge, um Context-Window-Limits (Token-Limits) zu vermeiden
-        context_text = "\n\n".join(context_data)[:10000] 
-
-        # 2. System Prompt mit striktem Zwang zur JSON-Ausgabe
-        system_prompt = """Du bist ein Innovations-Stratege für studentische Services. 
-        Analysiere die empirischen Daten und generiere EINE konkrete, technologische oder soziale Service-Lösung.
-        Du MUSST ein reines JSON-Objekt zurückgeben. Das Format MUSS exakt so aussehen:
-        {
-            "cluster": "Name des Hauptproblem-Clusters (z.B. Wohnungsnot & Bürokratie)",
-            "opportunity": "Einprägsamer Name der Lösung (z.B. Bürokratie-Navigator)",
-            "solution": "2-3 Sätze architektonische Beschreibung des Konzepts",
-            "target": "Zielgruppe (z.B. Internationale Erstsemester)",
-            "stakeholder": "Zuständige Akteure (z.B. Studierendenwerk, IT-Zentrum)"
-        }"""
+    def _latest_report(self, cursor):
+        cursor.execute("SELECT id, created_at, report_json FROM system_reports ORDER BY id DESC LIMIT 1")
+        row = cursor.fetchone()
+        if not row:
+            return None
 
         try:
-            # 3. LLM API Call über Groq (Nutzung des großen Llama 3.3 Modells)
-            response = self.client.chat.completions.create(
-                model="llama-3.3-70b-versatile", 
-                messages=[
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": f"Hier sind die Daten:\n{context_text}"}
-                ],
-                response_format={"type": "json_object"}, # Erzwingt maschinenlesbares JSON!
-                temperature=0.7 # Höhere Temperatur für kreativere Lösungsansätze
+            report = json.loads(row[2])
+        except json.JSONDecodeError:
+            report = {}
+
+        return {"id": row[0], "created_at": row[1], "report": report, "raw": row[2]}
+
+    def _source_signature(self, records):
+        digest = hashlib.sha256()
+        for db_id, cleaned_text, analysis_json in records:
+            digest.update(str(db_id).encode("utf-8"))
+            digest.update(b"\0")
+            digest.update((analysis_json or "").encode("utf-8", errors="ignore"))
+            digest.update(b"\0")
+            digest.update((cleaned_text or "")[:120].encode("utf-8", errors="ignore"))
+            digest.update(b"\0")
+        return digest.hexdigest()
+
+    def _parse_analysis(self, analysis_json):
+        try:
+            data = json.loads(analysis_json or "{}")
+            return data if isinstance(data, dict) else {}
+        except json.JSONDecodeError:
+            return {}
+
+    def _shorten(self, text, limit):
+        clean = " ".join(str(text or "").split())
+        if len(clean) <= limit:
+            return clean
+        return clean[: limit - 1].rstrip() + "..."
+
+    def _build_evidence_bundle(self, records, source_signature):
+        clusters = Counter()
+        urgencies = Counter()
+        tones = Counter()
+        stakeholders = Counter()
+        cluster_urgencies = defaultdict(Counter)
+        representative_pool = []
+
+        for db_id, cleaned_text, analysis_json in records:
+            analysis = self._parse_analysis(analysis_json)
+            cluster = analysis.get("problem_cluster") or "Unbekannt"
+            urgency = analysis.get("urgency") or "Unbekannt"
+            tone = analysis.get("emotional_tone") or "Unbekannt"
+            stakeholder_list = analysis.get("stakeholders")
+            if not isinstance(stakeholder_list, list):
+                stakeholder_list = []
+
+            clusters[cluster] += 1
+            urgencies[urgency] += 1
+            tones[tone] += 1
+            cluster_urgencies[cluster][urgency] += 1
+            stakeholders.update(str(item) for item in stakeholder_list if item)
+
+            priority = 0
+            if urgency == "Hoch":
+                priority += 3
+            elif urgency == "Mittel":
+                priority += 2
+            if tone == "Akut belastet":
+                priority += 2
+            elif tone == "Hilfesuchend":
+                priority += 1
+
+            representative_pool.append(
+                {
+                    "priority": priority,
+                    "id": db_id,
+                    "cluster": cluster,
+                    "urgency": urgency,
+                    "emotional_tone": tone,
+                    "stakeholders": stakeholder_list[:4],
+                    "text_excerpt": self._shorten(cleaned_text, self.max_example_chars),
+                }
             )
-            
-            result_json_str = response.choices[0].message.content
-            
-            # 4. Das generierte JSON in der Datenbank speichern (für das Streamlit Dashboard)
-            cursor.execute("INSERT INTO system_reports (report_json) VALUES (?)", (result_json_str,))
-            conn.commit()
-            print("[Agent 4 SUCCESS] Neue Service-Innovation erfolgreich generiert und in der DB gespeichert!")
-            
-        except Exception as e:
-            print(f"[Agent 4 ERROR] Innovations-Generierung fehlgeschlagen: {e}")
-            
+
+        representative_pool.sort(key=lambda item: (item["priority"], item["id"]), reverse=True)
+        representative_cases = []
+        seen_clusters = set()
+
+        for item in representative_pool:
+            if len(representative_cases) >= self.max_examples:
+                break
+            if item["cluster"] not in seen_clusters or len(representative_cases) < 3:
+                item = dict(item)
+                item.pop("priority", None)
+                representative_cases.append(item)
+                seen_clusters.add(item["cluster"])
+
+        if len(representative_cases) < self.max_examples:
+            used_ids = {item["id"] for item in representative_cases}
+            for item in representative_pool:
+                if len(representative_cases) >= self.max_examples:
+                    break
+                if item["id"] in used_ids:
+                    continue
+                item = dict(item)
+                item.pop("priority", None)
+                representative_cases.append(item)
+
+        cluster_summary = []
+        total = len(records)
+        for cluster, count in clusters.most_common():
+            cluster_summary.append(
+                {
+                    "cluster": cluster,
+                    "count": count,
+                    "share_percent": round((count / total) * 100, 1) if total else 0,
+                    "urgency_distribution": dict(cluster_urgencies[cluster].most_common()),
+                }
+            )
+
+        return {
+            "source_count": total,
+            "source_signature": source_signature,
+            "aggregation_strategy": "agent3_json_compressed_for_llm",
+            "cluster_summary": cluster_summary,
+            "urgency_distribution": dict(urgencies.most_common()),
+            "emotional_tone_distribution": dict(tones.most_common()),
+            "top_stakeholders": [
+                {"name": name, "mentions": count}
+                for name, count in stakeholders.most_common(12)
+            ],
+            "representative_cases": representative_cases,
+        }
+
+    def _build_messages(self, evidence_bundle):
+        system_prompt = """
+You are a service innovation strategist for student support systems in Germany.
+
+Your task is not to summarize complaints. Your task is to generate a portfolio
+of 3-5 concrete, implementable service innovations based on the empirical weak
+signals produced by Agent 3.
+
+Use only the provided aggregated evidence:
+- problem clusters
+- urgency distribution
+- emotional tone distribution
+- stakeholders
+- representative anonymized cases
+
+Return exactly one JSON object. No markdown, no commentary, no text outside JSON.
+All JSON values must be written in German and should use German institutional
+terms where appropriate, for example Studierendenwerk, BAföG-Amt,
+Hochschulberatung, International Office, Prüfungsamt, Sozialberatung.
+
+The JSON must contain these top-level fields:
+{
+  "portfolio_summary": "2-3 Sätze, welche Service-Lücken das Portfolio insgesamt adressiert",
+  "innovations": [
+    {
+      "cluster": "Zentrales systemisches Problemcluster",
+      "opportunity": "Einprägsamer Name einer konkreten Serviceidee",
+      "solution": "2-4 Sätze zur Servicearchitektur und zum konkreten Konzept",
+      "target": "Primäre Zielgruppe",
+      "stakeholder": "Zuständige oder beteiligte Akteure",
+      "evidence": "1-2 Sätze, welche aggregierten Signale die Idee begründen",
+      "implementation_steps": ["Schritt 1", "Schritt 2", "Schritt 3"],
+      "risk": "Zentrales Umsetzungsrisiko oder ethische Grenze"
+    }
+  ]
+}
+
+The innovation portfolio must:
+1. address the strongest systemic service gaps in the evidence,
+2. be feasible for a German university / Studierendenwerk context,
+3. reduce friction in an existing process or connect existing stakeholders,
+4. be more specific than an awareness campaign or generic counselling offer,
+5. explain why the data supports this idea,
+6. avoid inventing raw data, statistics, laws, or institutional procedures.
+
+Diversity constraints:
+- Generate at least 3 innovations if at least 3 problem clusters exist.
+- Each innovation should address a different problem cluster whenever possible.
+- Do not generate more than one financial-aid / BAföG / Finanzen idea.
+- Include smaller but meaningful clusters if they reveal a distinct service gap.
+- Prefer a balanced portfolio over repeating the dominant cluster.
+"""
+
+        user_prompt = (
+            "Here is the compressed evidence bundle generated from Agent 3 JSON analyses:\n"
+            f"{json.dumps(evidence_bundle, ensure_ascii=False, indent=2)}"
+        )
+
+        return [
+            {"role": "system", "content": system_prompt.strip()},
+            {"role": "user", "content": user_prompt},
+        ]
+
+    def _retry_after_seconds(self, exc):
+        response = getattr(exc, "response", None)
+        headers = getattr(response, "headers", None)
+        if not headers:
+            return None
+
+        value = None
+        try:
+            value = headers.get("retry-after") or headers.get("Retry-After")
+        except AttributeError:
+            value = None
+
+        if not value:
+            return None
+
+        try:
+            return min(float(value), self.max_retry_sleep)
+        except ValueError:
+            return None
+
+    def _is_retryable(self, exc):
+        status_code = getattr(exc, "status_code", None)
+        response = getattr(exc, "response", None)
+        if status_code is None and response is not None:
+            status_code = getattr(response, "status_code", None)
+        return status_code in {408, 409, 429, 500, 502, 503, 504} or status_code is None
+
+    def _completion_create(self, provider, messages, use_response_format=True):
+        kwargs = {
+            "model": provider["model"],
+            "messages": messages,
+            "temperature": self.temperature,
+        }
+        if use_response_format:
+            kwargs["response_format"] = {"type": "json_object"}
+        return provider["client"].chat.completions.create(**kwargs)
+
+    def _call_provider(self, provider, messages):
+        last_error = None
+        for attempt in range(1, self.max_retries + 1):
+            try:
+                response = self._completion_create(provider, messages, use_response_format=True)
+                return response.choices[0].message.content
+            except Exception as exc:
+                last_error = exc
+                message = str(exc).lower()
+
+                # Some OpenAI-compatible gateways do not support response_format.
+                # The prompt still enforces JSON, so retry once without that param.
+                if "response_format" in message or "json_object" in message:
+                    try:
+                        response = self._completion_create(provider, messages, use_response_format=False)
+                        return response.choices[0].message.content
+                    except Exception as fallback_exc:
+                        last_error = fallback_exc
+
+                if attempt >= self.max_retries or not self._is_retryable(last_error):
+                    break
+
+                sleep_seconds = self._retry_after_seconds(last_error)
+                if sleep_seconds is None:
+                    sleep_seconds = min(self.retry_base_seconds * (2 ** (attempt - 1)), self.max_retry_sleep)
+
+                print(
+                    f"[Agent 4 WARN] {provider['name']} attempt {attempt}/{self.max_retries} failed. "
+                    f"Retrying in {sleep_seconds:.1f}s..."
+                )
+                time.sleep(sleep_seconds)
+
+        raise last_error
+
+    def _extract_json_object(self, text):
+        try:
+            parsed = json.loads(text)
+            if isinstance(parsed, dict):
+                return parsed
+        except json.JSONDecodeError:
+            pass
+
+        start = text.find("{")
+        end = text.rfind("}")
+        if start >= 0 and end > start:
+            parsed = json.loads(text[start : end + 1])
+            if isinstance(parsed, dict):
+                return parsed
+
+        raise ValueError("LLM response did not contain a valid JSON object.")
+
+    def _validate_report(self, report):
+        # Backward compatibility: older prompts returned a single innovation at
+        # the top level. Normalize that shape into the new portfolio format.
+        if "innovations" not in report and all(
+            report.get(field) for field in self.REQUIRED_INNOVATION_FIELDS
+        ):
+            report = {
+                "portfolio_summary": "Ein einzelner Service-Innovationsvorschlag wurde aus den stärksten Signalen generiert.",
+                "innovations": [report],
+            }
+
+        innovations = report.get("innovations")
+        if not isinstance(innovations, list) or not innovations:
+            raise ValueError("LLM report must contain a non-empty 'innovations' list.")
+
+        for index, innovation in enumerate(innovations, start=1):
+            if not isinstance(innovation, dict):
+                raise ValueError(f"Innovation #{index} is not a JSON object.")
+
+            missing = [
+                field
+                for field in self.REQUIRED_INNOVATION_FIELDS
+                if not innovation.get(field)
+            ]
+            if missing:
+                raise ValueError(
+                    f"Innovation #{index} missing required fields: {', '.join(missing)}"
+                )
+
+            if not isinstance(innovation.get("implementation_steps", []), list):
+                innovation["implementation_steps"] = [str(innovation["implementation_steps"])]
+
+        if not report.get("portfolio_summary"):
+            report["portfolio_summary"] = (
+                "Das Portfolio bündelt mehrere LLM-generierte Serviceideen aus den "
+                "stärksten analysierten Bedarfssignalen."
+            )
+
+        return report
+
+    def _metadata(self, provider, source_signature, source_count):
+        return {
+            "generated_by_llm": True,
+            "provider": provider["name"],
+            "model": provider["model"],
+            "source_count": source_count,
+            "source_signature": source_signature,
+            "prompt_strategy": "aggregated_agent3_signals_portfolio",
+            "created_at_utc": datetime.now(timezone.utc).isoformat(),
+        }
+
+    def _has_current_cached_report(self, latest_report, source_signature):
+        if not latest_report:
+            return False
+        metadata = latest_report["report"].get("llm_metadata", {})
+        return (
+            metadata.get("generated_by_llm") is True
+            and metadata.get("source_signature") == source_signature
+            and metadata.get("prompt_strategy") == "aggregated_agent3_signals_portfolio"
+        )
+
+    def run(self, force=False):
+        print("\n---------------------------------------------------------------------")
+        print("[Agent 4] Starting LLM innovation generator")
+        print("---------------------------------------------------------------------")
+
+        conn = sqlite3.connect(self.db_file)
+        cursor = conn.cursor()
+
+        records = self._load_analyzed_records(cursor)
+        if not records:
+            print("[Agent 4 INFO] No status=2 records available for LLM innovation generation.")
+            conn.close()
+            return None
+
+        source_signature = self._source_signature(records)
+        latest_report = self._latest_report(cursor)
+
+        if not force and self._has_current_cached_report(latest_report, source_signature):
+            metadata = latest_report["report"].get("llm_metadata", {})
+            print(
+                "[Agent 4 CACHE] Current LLM report already exists "
+                f"({metadata.get('provider')}/{metadata.get('model')}, source_count={metadata.get('source_count')})."
+            )
+            conn.close()
+            return latest_report["report"]
+
+        evidence_bundle = self._build_evidence_bundle(records, source_signature)
+        messages = self._build_messages(evidence_bundle)
+
+        print(
+            f"[Agent 4] Built compressed evidence bundle from {len(records)} analyzed records. "
+            f"Trying providers: {', '.join(p['name'] for p in self.providers)}"
+        )
+
+        errors = []
+        for provider in self.providers:
+            try:
+                print(f"[Agent 4] Calling {provider['name']} / {provider['model']}...")
+                raw_response = self._call_provider(provider, messages)
+                report = self._extract_json_object(raw_response)
+                report = self._validate_report(report)
+                report["llm_metadata"] = self._metadata(provider, source_signature, len(records))
+
+                report_json = json.dumps(report, ensure_ascii=False, indent=2)
+                cursor.execute("INSERT INTO system_reports (report_json) VALUES (?)", (report_json,))
+                conn.commit()
+                conn.close()
+
+                print("[Agent 4 SUCCESS] New LLM-generated service innovation saved to system_reports.")
+                return report
+            except Exception as exc:
+                error_message = f"{provider['name']} failed: {exc}"
+                errors.append(error_message)
+                print(f"[Agent 4 ERROR] {error_message}")
+
+        if latest_report and latest_report["report"]:
+            print("[Agent 4 STALE] All providers failed. Keeping the latest existing LLM report in the dashboard.")
+            conn.close()
+            return latest_report["report"]
+
         conn.close()
+        print("[Agent 4 FAILED] No provider produced a report, and no previous LLM report exists.")
+        print("[Agent 4 FAILED] Provider errors:")
+        for error in errors:
+            print(f"  - {error}")
+        return None
+
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Generate an LLM-based Service Sonar innovation report.")
+    parser.add_argument("--force", action="store_true", help="Ignore cache and generate a fresh LLM report.")
+    args = parser.parse_args()
+
     innovator = Agent4Innovator()
-    innovator.run()
+    innovator.run(force=args.force)
