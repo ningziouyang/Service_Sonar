@@ -1,1 +1,5 @@
 streamlit==1.46.0
+requests
+beautifulsoup4
+openai
+python-dotenv
