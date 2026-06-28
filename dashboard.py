@@ -2,6 +2,7 @@ import html
 import json
 import sqlite3
 from collections import Counter, defaultdict
+from datetime import datetime
 from pathlib import Path
 from textwrap import dedent
 
@@ -378,6 +379,58 @@ footer { display:none !important; }
   .cl-flow-row { display:grid; grid-template-columns:1fr; gap:10px; }
   .cl-flow-arrow { display:none; }
 }
+.health-grid {
+  display:grid;
+  grid-template-columns:repeat(4, minmax(0, 1fr));
+  gap:14px;
+  margin-top:24px;
+}
+
+.health-card {
+  background:white;
+  border:0.5px solid var(--border);
+  border-radius:var(--rlg);
+  padding:18px;
+}
+
+.health-value {
+  font-family:'DM Serif Display', Georgia, serif;
+  font-size:24px;
+  color:var(--p600);
+  line-height:1.2;
+  word-break:break-word;
+}
+
+.health-label {
+  font-size:12px;
+  color:var(--muted);
+  margin-top:6px;
+}
+
+.health-status-row {
+  display:flex;
+  flex-wrap:wrap;
+  gap:10px;
+  margin-top:14px;
+}
+
+.health-status-row span {
+  background:white;
+  border:0.5px solid var(--border);
+  border-radius:40px;
+  padding:7px 13px;
+  font-size:12px;
+  color:var(--muted);
+}
+
+.health-warning {
+  margin-top:16px;
+  background:var(--amb50);
+  color:var(--amb600);
+  border-radius:var(--rmd);
+  padding:12px 16px;
+  font-size:13px;
+}
 </style>
 """
 
@@ -417,6 +470,115 @@ def status_as_int(value) -> int:
     except (TypeError, ValueError):
         return 0
 
+def get_pipeline_health(reports):
+    """
+    Creates a compact health snapshot for the dashboard.
+    This does not run the pipeline. It only shows the current database state.
+    """
+    db_exists = DB_FILE.exists()
+
+    health = {
+        "db_exists": db_exists,
+        "db_last_modified": None,
+        "total_posts": 0,
+        "status_counts": {-1: 0, 0: 0, 1: 0, 2: 0, 3: 0},
+        "latest_report_created_at": None,
+    }
+
+    if reports:
+        health["latest_report_created_at"] = reports[0].get("created_at")
+
+    if not db_exists:
+        return health
+
+    try:
+        health["db_last_modified"] = datetime.fromtimestamp(
+            DB_FILE.stat().st_mtime
+        ).strftime("%Y-%m-%d %H:%M")
+    except OSError:
+        health["db_last_modified"] = "Could not read file timestamp"
+
+    try:
+        conn = sqlite3.connect(DB_FILE)
+        cursor = conn.cursor()
+
+        cursor.execute("SELECT status, COUNT(*) FROM forum_posts GROUP BY status")
+        for status, count in cursor.fetchall():
+            health["status_counts"][status_as_int(status)] = count
+
+        health["total_posts"] = sum(health["status_counts"].values())
+        conn.close()
+
+    except sqlite3.Error as error:
+        health["error"] = str(error)
+
+    return health
+
+
+def render_pipeline_health(health):
+    counts = health["status_counts"]
+    total_posts = health["total_posts"]
+    analyzed_count = counts.get(2, 0)
+    pending_agent3 = counts.get(1, 0)
+    human_review = counts.get(3, 0)
+
+    completion_rate = round((analyzed_count / total_posts) * 100) if total_posts else 0
+
+    db_status = "Connected" if health["db_exists"] else "Missing"
+    db_modified = health["db_last_modified"] or "N/A"
+    latest_report = health["latest_report_created_at"] or "No report timestamp found"
+
+    warning_html = ""
+    if pending_agent3 > 0 or human_review > 0:
+        warning_html = f"""
+        <div class="health-warning">
+          {pending_agent3} cleaned posts are still waiting for Agent 3; {human_review} cases are waiting for Human Review.
+        </div>
+        """
+
+    render_html(
+        f"""
+<section class="section" id="health">
+  <div class="sec-wrap">
+    <div class="sec-label">Pipeline Health</div>
+    <h2 class="sec-title">Data freshness and processing state</h2>
+    <p class="sec-body">
+      This panel shows whether the dashboard reflects a recently processed database state
+      or whether records are still waiting in earlier pipeline stages.
+    </p>
+
+    <div class="health-grid">
+      <div class="health-card">
+        <div class="health-value">{esc(db_status)}</div>
+        <div class="health-label">SQLite database</div>
+      </div>
+      <div class="health-card">
+        <div class="health-value">{esc(db_modified)}</div>
+        <div class="health-label">Last database update</div>
+      </div>
+      <div class="health-card">
+        <div class="health-value">{completion_rate}%</div>
+        <div class="health-label">Analyzed share</div>
+      </div>
+      <div class="health-card">
+        <div class="health-value">{esc(latest_report)}</div>
+        <div class="health-label">Latest Agent 4 report</div>
+      </div>
+    </div>
+
+    <div class="health-status-row">
+      <span>Status -1 filtered: <strong>{counts.get(-1, 0)}</strong></span>
+      <span>Status 0 raw: <strong>{counts.get(0, 0)}</strong></span>
+      <span>Status 1 cleaned: <strong>{counts.get(1, 0)}</strong></span>
+      <span>Status 2 analyzed: <strong>{counts.get(2, 0)}</strong></span>
+      <span>Status 3 review: <strong>{counts.get(3, 0)}</strong></span>
+    </div>
+
+    {warning_html}
+  </div>
+</section>
+"""
+    )
 
 def normalize_cluster(raw_cluster, cleaned_content="") -> str:
     raw = str(raw_cluster or "").strip()
@@ -1067,6 +1229,8 @@ def main():
         urgent_count=urgent_count,
     )
     render_pipeline(status_counts)
+    health = get_pipeline_health(reports)
+    render_pipeline_health(health)
     render_problem_dashboard(groups, len(analyses))
     render_cluster_section(groups, len(analyses))
     render_stakeholders(stakeholder_counts)
