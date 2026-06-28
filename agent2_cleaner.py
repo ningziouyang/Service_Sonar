@@ -42,6 +42,23 @@ class Agent2Cleaner:
         text = re.sub(r"\s+", " ", text).strip()
 
         return text
+    
+    def _remove_forum_metadata(self, text: str) -> str:
+        """
+        Entfernt technische Foren-Metadaten wie Nutzername, Datum-Icon,
+        Gerätetyp und Zeitstempel am Anfang des Inhalts.
+        Beispiel:
+        Chrissy1969 📅 [PHONE]:51:46 BaFöG ...
+        -> BaFöG ...
+        """
+
+        text = re.sub(
+            r"\b[\wÄÖÜäöüß.-]{3,30}\s*📅\s*\[PHONE\]:\d{1,2}:\d{2}\s*",
+            "",
+            text
+        )
+
+        return text.strip()
 
     def _anonymize_text(self, text: str) -> str:
         """
@@ -155,6 +172,7 @@ class Agent2Cleaner:
 
         for db_id, raw_text in records:
             cleaned = self._clean_text(raw_text)
+            cleaned = self._remove_forum_metadata(cleaned)
             anonymized = self._anonymize_text(cleaned)
 
             if not anonymized:
