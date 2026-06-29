@@ -92,6 +92,11 @@ CUSTOM_CSS = """
 @import url('https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.10.0/dist/tabler-icons.min.css');
 
 *, *::before, *::after { box-sizing: border-box; }
+html{scroll-behavior:smooth;}
+[data-testid="stAppViewContainer"]{scroll-behavior:smooth!important;}
+[data-testid="stMain"]{scroll-behavior:smooth!important;}
+.main{scroll-behavior:smooth!important;}
+#pipeline,#dashboard,#cluster,#stakeholder,#innovation{scroll-margin-top:82px;}
 
 :root {
   --p50:#EEEDFE; --p100:#CECBF6; --p200:#AFA9EC; --p600:#534AB7; --p800:#3C3489;
@@ -117,16 +122,19 @@ footer { display:none !important; }
     var(--bg) !important;
   color:var(--text);
 }
+
 .block-container {
-  max-width:1180px !important;
+  max-width:none !important;
+  width:100% !important;
   padding:0 24px 36px !important;
   font-family:'DM Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
+.block-container > div[data-testid="stVerticalBlock"]{gap:0!important;}
 #MainMenu { visibility:hidden; }
 
 .ss-shell { max-width:var(--max); margin:0 auto; }
 .ss-nav {
-  position:sticky; top:0; z-index:20; height:58px; margin:0 -24px 0;
+  position:sticky; top:0; z-index:20; height:58px; margin:0 -24px;
   background:rgba(247,246,255,0.92); backdrop-filter:blur(16px);
   border-bottom:0.5px solid var(--border);
 }
@@ -157,7 +165,7 @@ footer { display:none !important; }
 .nav-btn:hover { background:var(--p800); transform:translateY(-1px); }
 
 .hero {
-  margin:0 -24px; padding:80px 36px 68px;
+  margin:0 -24px; width:calc(100% + 48px); padding:80px 36px 68px;
   background:linear-gradient(150deg,#eceaff 0%,#ede8ff 35%,#e5eeff 70%,#eaf4ff 100%);
   border-bottom:0.5px solid var(--border);
 }
@@ -218,7 +226,7 @@ footer { display:none !important; }
 .pipe-tags { display:flex; flex-wrap:wrap; gap:6px; }
 .ex-tag { font-size:12px; padding:4px 12px; border-radius:20px; background:white; border:0.5px solid var(--border); color:var(--muted); }
 
-.dashboard-section { padding:0 0 76px; }
+.dashboard-section { padding:76px 0 76px; }
 .dash-outer { background:var(--dark); border-radius:var(--rxl); padding:46px; box-shadow:0 24px 80px rgba(18,17,42,.18); }
 .dash-source-row { display:flex; align-items:center; justify-content:space-between; gap:16px; margin-bottom:28px; flex-wrap:wrap; }
 .source-badge, .live-badge {
@@ -523,8 +531,28 @@ footer { display:none !important; }
   }
 }
 
+/* SERVICE GENERATION OUTPUT */
+.ai-section{padding:76px 0 28px;}
+.ai-inner{max-width:var(--max);margin:0 auto;}
+.st-key-innovation_form{max-width:var(--max);margin:0 auto 36px;padding:34px 36px 30px;background:var(--p50);border:0.5px solid var(--border);border-radius:var(--rxl);}
+.st-key-innovation_form .ai-box-label{font-size:13px;font-weight:500;color:var(--p600);margin:0 0 16px;}
+.st-key-innovation_form div[data-testid="stHorizontalBlock"]{max-width:none;margin:0;gap:10px;align-items:center;}
+.st-key-innovation_form div[data-testid="stHorizontalBlock"]+div[data-testid="stHorizontalBlock"]{margin-top:12px;justify-content:flex-start;}
+.st-key-innovation_form div[data-testid="stHorizontalBlock"]+div[data-testid="stHorizontalBlock"]>div[data-testid="column"]{flex:0 0 auto!important;width:auto!important;min-width:0!important;}
+.st-key-innovation_form div[data-testid="stTextInput"]{margin:0!important;overflow:visible!important;}
+.st-key-innovation_form div[data-testid="stTextInput"]>div{height:52px!important;overflow:visible!important;}
+.st-key-innovation_form div[data-baseweb="input"]{height:52px!important;min-height:52px!important;border-radius:999px!important;overflow:hidden!important;background:white!important;}
+.st-key-innovation_form div[data-testid="stTextInput"] input{height:52px!important;min-height:52px!important;line-height:52px!important;border-radius:999px!important;border:1px solid #d8d4f8!important;padding:0 20px!important;background:white!important;font-size:14px!important;box-sizing:border-box!important;}
+.st-key-innovation_form div[data-testid="stTextInput"] input:focus{border-color:var(--p600)!important;box-shadow:0 0 0 2px rgba(83,74,183,.12)!important;}
+.st-key-innovation_form div[data-testid="stButton"]{margin:0!important;}
+.st-key-innovation_form div[data-testid="stButton"] button{min-height:40px;border-radius:999px;padding:0 16px;border:1px solid #d8d4f8;background:white;color:var(--p600);font-size:12px;font-weight:400;white-space:nowrap;}
+.st-key-innovation_form div[data-testid="stButton"] button:hover{border-color:var(--p600);background:#f8f7ff;color:var(--p800);}
+.st-key-analyze_signal button{height:52px!important;min-height:52px!important;padding:0 22px!important;background:var(--p600)!important;color:white!important;border:1px solid var(--p600)!important;font-size:14px!important;font-weight:500!important;}
+.st-key-analyze_signal button:hover{background:var(--p800)!important;color:white!important;border:1px solid var(--p800)!important;}
+.ai-result-box{max-width:var(--max);margin:18px auto 0;background:white;border:0.5px solid var(--border);border-radius:var(--rlg);padding:22px;}
 
-.ai-section { padding:0 0 76px; }
+/*  */
+
 .ai-box { background:var(--p50); border-radius:var(--rxl); padding:36px; border:0.5px solid var(--border); }
 .ai-result { background:white; border:0.5px solid #ddd; border-radius:var(--rlg); padding:24px; font-size:14px; line-height:1.7; color:#333; }
 .ai-kicker { font-size:11px; font-weight:500; text-transform:uppercase; letter-spacing:.06em; color:var(--p600); margin-bottom:6px; }
@@ -542,7 +570,7 @@ footer { display:none !important; }
 
 .data-lab {
   background:white; border:0.5px solid var(--border); border-radius:var(--rxl); padding:26px;
-  margin-bottom:26px; box-shadow:0 8px 36px rgba(83,74,183,.06);
+  margin:100px 0; box-shadow:0 8px 36px rgba(83,74,183,.06);
 }
 .status-grid { display:grid; grid-template-columns:repeat(5, minmax(0,1fr)); gap:10px; margin:16px 0 24px; }
 .status-card { background:#faf9ff; border:0.5px solid var(--border); border-radius:var(--rmd); padding:14px; }
@@ -821,8 +849,8 @@ def render_pipeline(status_counts):
     review_count = status_counts.get(3, 0)
     render_html(
         f"""
-<section class="section" id="pipeline">
-  <div class="sec-wrap">
+<section class="section">
+  <div class="sec-wrap" id="pipeline">
     <div class="sec-label">Was Service Sonar leistet</div>
     <h2 class="sec-title">Drei Schritte von Daten zur Innovation</h2>
     <p class="sec-body">Die Streamlit-Version folgt dem Look des HTML-Prototyps, liest aber live aus der lokalen SQLite-Datenbank.</p>
@@ -907,8 +935,8 @@ def render_problem_dashboard(groups, analyzed_count):
 
     render_html(
         f"""
-<section class="dashboard-section" id="dashboard">
-  <div class="dash-outer">
+<section class="dashboard-section">
+  <div class="dash-outer" id="dashboard">
     <div class="dash-source-row">
       <div class="source-badge"><i class="ti ti-database" style="font-size:14px;color:var(--p200)"></i><strong>{analyzed_count} Quellen analysiert</strong></div>
       <div class="live-badge"><div class="live-dot"></div>Live SQLite Monitoring</div>
@@ -977,8 +1005,8 @@ def render_cluster_section(groups, analyzed_count):
 
     render_html(
         f"""
-<section class="section" id="cluster">
-  <div class="cluster-panel">
+<section class="section">
+  <div class="cluster-panel" id="cluster">
     <div class="sec-label">Dynamic Problem Clustering</div>
     <h2 class="sec-title">Von Symptomen zu systemischen L&uuml;cken</h2>
     <p class="sec-body">Einzelne Posts zeigen Symptome. Erst die Verdichtung nach Cluster, Dringlichkeit und Stakeholdern macht sichtbar, wo ein neuer Service ansetzen kann.</p>
@@ -1390,6 +1418,130 @@ def render_stakeholders(stakeholder_counts):
 """
     )
 
+def render_innovation_new(reports, groups):
+    if "signal_input" not in st.session_state:
+        st.session_state.signal_input = ""
+
+    render_html(
+        """
+<section class="ai-section">
+  <div class="ai-inner" id="innovation">
+    <div class="sec-label">Service Innovation Output</div>
+
+    <h2 class="sec-title">
+      Du siehst eine Lücke? Hier wird daraus eine Idee.
+    </h2>
+
+    <p class="sec-body" style="margin-bottom:28px;">
+      Beschreib ein Problem, das du bei Studierenden beobachtest
+      &mdash; oder eine Lücke, die noch niemand schließt.
+      Service Sonar analysiert es, ordnet es einem systemischen
+      Cluster zu und schlägt einen konkreten neuen Service vor.
+    </p>
+  </div>
+</section>
+"""
+    )
+
+    with st.container(key="innovation_form"):
+        st.markdown(
+            '<div class="ai-box-label">Lücke oder Signal eingeben:</div>',
+            unsafe_allow_html=True,
+        )
+
+        input_col, button_col = st.columns(
+            [5.4, 1],
+            vertical_alignment="center",
+        )
+
+        with input_col:
+            signal = st.text_input(
+                "Signal",
+                key="signal_input",
+                label_visibility="collapsed",
+                placeholder=(
+                    "z. B. Keine Anlaufstelle für Behördenfragen "
+                    "auf Englisch..."
+                ),
+            )
+
+        with button_col:
+            analyze_clicked = st.button(
+                "Analysieren ↗",
+                use_container_width=True,
+                key="analyze_signal",
+            )
+
+        suggestions = [
+            (
+                "Beratung überlastet",
+                "Beratungsstellen sind überlastet – Wartezeiten bis 6 Wochen",
+            ),
+            (
+                "Behörden & Sprache",
+                "Keine einheitliche Anlaufstelle für Behördenfragen auf Englisch",
+            ),
+            (
+                "Erstsemester-Isolation",
+                "Erstsemester fühlen sich nach der Einführungswoche allein gelassen",
+            ),
+            (
+                "BAföG-Hürden",
+                "BAföG-Anträge scheitern oft an bürokratischen Hürden, nicht am Anspruch",
+            ),
+        ]
+
+        suggestion_cols = st.columns([1.15, 1.25, 1.55, 1])
+
+        for column, (label, value) in zip(suggestion_cols, suggestions):
+            with column:
+                if st.button(
+                    label,
+                    use_container_width=True,
+                    key=f"suggestion_{label}",
+                ):
+                    st.session_state.signal_input = value
+                    st.rerun()
+
+    if analyze_clicked:
+        if not signal.strip():
+            st.warning(
+                "Bitte zuerst eine Lücke oder ein Signal eingeben."
+            )
+        else:
+            result = generate_service_idea(signal)
+
+            render_html(
+                f"""
+<div class="ai-inner">
+  <div class="ai-result-box">
+    <div class="ai-kicker">
+      Generierte Serviceidee
+    </div>
+
+    <div class="ai-name">
+      {esc(result["idea"])}
+    </div>
+
+    <p>
+      <strong>Cluster:</strong>
+      {esc(result["cluster"])}
+    </p>
+
+    <p>
+      <strong>Konzept:</strong>
+      {esc(result["concept"])}
+    </p>
+
+    <p>
+      <strong>Stakeholder:</strong>
+      {esc(result["stakeholder"])}
+    </p>
+  </div>
+</div>
+"""
+    )
+
 
 def render_innovation(reports, groups):
     latest = reports[0] if reports else None
@@ -1613,7 +1765,7 @@ def main():
     render_problem_dashboard(groups, len(analyses))
     render_cluster_section(groups, len(analyses))
     render_stakeholders(stakeholder_counts)
-    render_innovation(reports, groups)
+    render_innovation_new(reports, groups)
     render_status_lab(records, analyses, status_counts)
     render_footer()
 
