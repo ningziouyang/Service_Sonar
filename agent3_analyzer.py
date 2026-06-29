@@ -1,6 +1,8 @@
 import json
 import sqlite3
 import os
+import argparse
+import time
 from openai import OpenAI
 from dotenv import load_dotenv
 
@@ -60,16 +62,29 @@ class Agent3Analyzer:
             print(f"[Agent 3 ERROR] API-Aufruf fehlgeschlagen: {e}")
             return None
 
-    def run(self):
+    def run(self, limit=None, offset=0, sleep_seconds=0.0):
         """
         Agent 3 Interface: LLM-basierte semantische Analyse.
         """
         print(f"[Agent 3] Starte semantische Analyse über LLM ({self.model_name})...")
+        if limit is not None:
+            print(f"[Agent 3] Batch-Modus aktiv: limit={limit}, offset={offset}, sleep={sleep_seconds}s")
 
         conn = sqlite3.connect(self.db_file)
         cursor = conn.cursor()
 
-        cursor.execute("SELECT id, cleaned_content FROM forum_posts WHERE status = 1")
+        query = """
+            SELECT id, cleaned_content
+            FROM forum_posts
+            WHERE status = 1
+            ORDER BY id ASC
+        """
+        params = []
+        if limit is not None:
+            query += " LIMIT ? OFFSET ?"
+            params.extend([limit, offset])
+
+        cursor.execute(query, params)
         records = cursor.fetchall()
 
         if not records:
@@ -83,16 +98,27 @@ class Agent3Analyzer:
 
             # 🚀 Hier rufen wir das echte KI-Modell auf!
             analysis_dict = self._call_llm_api(cleaned_content)
-            
-            # Falls die API fehlgeschlagen ist → Beitrag nicht weiterverarbeiten
-            if analysis_dict is None:
-                print(f"[Agent 3] ID {db_id} bleibt status=1 wegen API-Fehler.")
+
+            # Wenn der API-Aufruf fehlschlägt, darf der Beitrag nicht als erfolgreich analysiert gelten.
+            if "error" in analysis_dict:
+                error_json = json.dumps(analysis_dict, ensure_ascii=False, indent=2)
+
+                cursor.execute(
+                    """
+                    UPDATE forum_posts
+                    SET analysis_json = ?, status = 1
+                    WHERE id = ?
+                    """,
+                    (error_json, db_id)
+                )
+
+                print(f"[Agent 3 ERROR] Analyse für ID {db_id} fehlgeschlagen -> bleibt status=1.")
                 continue
 
-             # Füge Metadaten hinzu
+            # Füge Metadaten hinzu (damit man später sieht, wie es analysiert wurde)
             analysis_dict["analysis_method"] = f"llm_api ({self.model_name})"
             analysis_dict["weak_signal_relevance"] = analysis_dict.get("urgency") in ["Mittel", "Hoch"]
-            
+
             analysis_json = json.dumps(analysis_dict, ensure_ascii=False, indent=2)
 
             cursor.execute(
@@ -103,12 +129,29 @@ class Agent3Analyzer:
                 """,
                 (analysis_json, db_id)
             )
-            print(f"[Agent 3] LLM-Analyse abgeschlossen für ID {db_id} → status=2.")
+
+            print(f"[Agent 3] LLM-Analyse abgeschlossen für ID {db_id} -> status=2.")
+
+            if sleep_seconds > 0:
+                time.sleep(sleep_seconds)
 
         conn.commit()
         conn.close()
         print("\n[Agent 3] Verarbeitung abgeschlossen.")
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Run Agent 3 semantic LLM analysis on cleaned forum posts.")
+    parser.add_argument("--limit", type=int, default=None, help="Maximum number of status=1 records to process.")
+    parser.add_argument("--offset", type=int, default=0, help="Skip this many status=1 records before processing.")
+    parser.add_argument("--sleep", type=float, default=0.0, help="Seconds to wait between LLM calls.")
+    args = parser.parse_args()
+
+    if args.limit is not None and args.limit <= 0:
+        raise ValueError("--limit must be a positive integer.")
+    if args.offset < 0:
+        raise ValueError("--offset must not be negative.")
+    if args.sleep < 0:
+        raise ValueError("--sleep must not be negative.")
+
     analyzer = Agent3Analyzer()
-    analyzer.run()
+    analyzer.run(limit=args.limit, offset=args.offset, sleep_seconds=args.sleep)

@@ -1,191 +1,1079 @@
+import html
 import json
 import sqlite3
+from collections import Counter, defaultdict
+from pathlib import Path
+from textwrap import dedent
+
 import streamlit as st
-from collections import Counter
 
-# =====================================================================
-# 1. Grundlegende Seiteneinrichtung
-# =====================================================================
-st.set_page_config(page_title="Service Sonar | Command Center", layout="wide", initial_sidebar_state="collapsed")
 
-# =====================================================================
-# 2. Premium Dark Mode & Enterprise SaaS CSS
-# =====================================================================
-custom_css = """<style>
-/* Ausblenden des Standard-Headers und Footers von Streamlit */
-[data-testid="stHeader"] { display: none !important; }
-footer { display: none !important; }
+st.set_page_config(
+    page_title="Service Sonar | Social Intelligence Platform",
+    layout="wide",
+    initial_sidebar_state="collapsed",
+)
 
-/* Extrem dunkler Hintergrund (Zinc 950) für High-End SaaS Look */
-[data-testid="stAppViewContainer"], .stApp { background-color: #09090b !important; color: #e4e4e7; }
+DB_FILE = Path(__file__).with_name("service_sonar.db")
 
-@import url('https://fonts.googleapis.com/css2?family=Geist:wght@300;400;600&family=JetBrains+Mono:wght@400;700&display=swap');
 
-.block-container { font-family: 'Geist', -apple-system, sans-serif; padding-top: 2rem !important; max-width: 1400px; }
+STATUS_META = {
+    -1: {
+        "label": "Filtered out",
+        "accent": "#E24B4A",
+        "copy": "Noise, ads or irrelevant posts",
+    },
+    0: {
+        "label": "Raw intake",
+        "accent": "#534AB7",
+        "copy": "Fresh forum posts from Agent 1",
+    },
+    1: {
+        "label": "Cleaned queue",
+        "accent": "#0F6E56",
+        "copy": "Anonymized and ready for LLM analysis",
+    },
+    2: {
+        "label": "Analyzed signals",
+        "accent": "#EF9F27",
+        "copy": "Structured by Agent 3",
+    },
+    3: {
+        "label": "Human review",
+        "accent": "#993556",
+        "copy": "Sensitive cases waiting for review",
+    },
+}
 
-/* Dashboard Header Design */
-.dash-header { border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 15px; margin-bottom: 30px; display: flex; justify-content: space-between; align-items: flex-end; }
-.dash-title { font-size: 28px; font-weight: 600; color: #ffffff; margin: 0; letter-spacing: -0.5px; }
-.dash-subtitle { font-size: 12px; color: #a1a1aa; text-transform: uppercase; letter-spacing: 2px; }
-.status-indicator { font-size: 12px; color: #10b981; display: flex; align-items: center; gap: 8px; font-family: 'JetBrains Mono', monospace; }
-.pulse-dot { width: 8px; height: 8px; background-color: #10b981; border-radius: 50%; box-shadow: 0 0 12px #10b981; }
+CLUSTER_META = {
+    "Finanzen": {
+        "display": "Finanzstress & BAf&ouml;G",
+        "short": "Finanzstress",
+        "keywords": ["BAf&ouml;G", "Miete", "Nebenjob", "Schulden"],
+        "diagnosis": "Financial pressure is not only a money problem. The signal points to paperwork friction, delayed aid, rent pressure and unclear fallback options.",
+        "overlap": "Often reinforced by housing stress and study pressure.",
+    },
+    "Mentale Gesundheit": {
+        "display": "Psychische Belastung",
+        "short": "Psyche",
+        "keywords": ["Burnout", "Isolation", "Angst", "Beratung"],
+        "diagnosis": "The pattern suggests a preventive service gap: students ask for help when stress is already acute, while early low-threshold support is hard to find.",
+        "overlap": "Often reinforced by exams, loneliness and financial insecurity.",
+    },
+    "Studium": {
+        "display": "Studien- und Pr&uuml;fungsdruck",
+        "short": "Studium",
+        "keywords": ["Pr&uuml;fung", "Module", "Semester", "Orientierung"],
+        "diagnosis": "Study-related signals cluster around uncertainty, decision pressure and late discovery of support options.",
+        "overlap": "Often reinforced by psychological load and financial pressure.",
+    },
+    "Wohnen": {
+        "display": "Wohnungsstress",
+        "short": "Wohnen",
+        "keywords": ["WG", "Wohnheim", "Miete", "Kaution"],
+        "diagnosis": "Housing signals indicate a structural access problem: students need trust, speed and local knowledge at the exact moment they have the least of it.",
+        "overlap": "Often reinforced by international access barriers and financial stress.",
+    },
+    "Sonstiges": {
+        "display": "Weitere Signale",
+        "short": "Sonstiges",
+        "keywords": ["Orientierung", "Service", "Support"],
+        "diagnosis": "The remaining signals are weaker individually, but useful as early probes for new service needs.",
+        "overlap": "Potential overlaps should be reviewed once more data is analyzed.",
+    },
+}
 
-/* Bento Card Style (Glasmorphismus) */
-.bento-card { background: #18181b; border: 1px solid #27272a; border-radius: 12px; padding: 24px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); height: 100%; }
-.bento-card-glow { border-top: 2px solid #3b82f6; }
+URGENCY_RANK = {"Hoch": 3, "Mittel": 2, "Niedrig": 1}
 
-/* Typografie */
-.metric-value { font-size: 56px; font-weight: 700; color: #ffffff; line-height: 1; font-family: 'JetBrains Mono', monospace; }
-.metric-label { font-size: 12px; color: #a1a1aa; text-transform: uppercase; letter-spacing: 1px; margin-top: 12px; }
-.sec-label { font-size: 11px; color: #71717a; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 6px; margin-top: 24px; }
-.main-text { font-size: 15px; color: #d4d4d8; line-height: 1.6; }
-.highlight { font-size: 18px; font-weight: 600; color: #60a5fa; }
 
-/* Konsolen-Look für Code-Boxen */
-.console-box { background: #000000; border: 1px solid #27272a; border-radius: 8px; padding: 16px; font-family: 'JetBrains Mono', monospace; font-size: 13px; color: #a1a1aa; margin-bottom: 16px; }
-.console-header { color: #52525b; font-size: 11px; margin-bottom: 8px; border-bottom: 1px solid #27272a; padding-bottom: 4px; display: flex; justify-content: space-between; }
+CUSTOM_CSS = """
+<style>
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,wght@0,400;0,500;0,700;1,400&family=DM+Serif+Display:ital@0;1&display=swap');
+@import url('https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.10.0/dist/tabler-icons.min.css');
 
-/* Tabs Styling */
-.stTabs [data-baseweb="tab-list"] { background-color: transparent; gap: 24px; }
-.stTabs [data-baseweb="tab"] { color: #a1a1aa; border-bottom-color: transparent !important; }
-.stTabs [aria-selected="true"] { color: #ffffff !important; border-bottom-color: #3b82f6 !important; }
-</style>"""
-st.markdown(custom_css, unsafe_allow_html=True)
+*, *::before, *::after { box-sizing: border-box; }
 
-# =====================================================================
-# 3. Datenbank-Verbindung & Hilfsfunktionen
-# =====================================================================
-DB_FILE = "service_sonar.db"
+:root {
+  --p50:#EEEDFE; --p100:#CECBF6; --p200:#AFA9EC; --p600:#534AB7; --p800:#3C3489;
+  --blue50:#E6F1FB; --blue600:#185FA5;
+  --amb50:#FAEEDA; --amb400:#EF9F27; --amb600:#854F0B;
+  --red50:#FCEBEB; --red400:#E24B4A; --red600:#A32D2D;
+  --coral50:#FAECE7; --coral600:#993C1D;
+  --pink50:#FBEAF0; --pink600:#993556;
+  --grn50:#EAF3DE; --grn400:#639922; --grn600:#3B6D11;
+  --teal50:#E1F5EE; --teal600:#0F6E56;
+  --dark:#12112a; --dmid:#1e1c3a; --dcard:#2a2848; --dtag:#3a3860;
+  --text:#1a1830; --muted:#5a5878; --light:#9896b8;
+  --border:rgba(83,74,183,0.12); --bg:#f7f6ff;
+  --rmd:10px; --rlg:18px; --rxl:28px; --max:1080px;
+}
 
-def get_db_records(status_code, limit=50):
-    """Holt die aktuellsten Einträge basierend auf ihrem Status-Code."""
+[data-testid="stHeader"] { display:none !important; }
+footer { display:none !important; }
+.stApp, [data-testid="stAppViewContainer"] {
+  background:
+    radial-gradient(circle at 8% 0%, rgba(175,169,236,.28), transparent 30%),
+    radial-gradient(circle at 94% 12%, rgba(24,95,165,.12), transparent 26%),
+    var(--bg) !important;
+  color:var(--text);
+}
+.block-container {
+  max-width:1180px !important;
+  padding:0 24px 36px !important;
+  font-family:'DM Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+#MainMenu { visibility:hidden; }
+
+.ss-shell { max-width:var(--max); margin:0 auto; }
+.ss-nav {
+  position:sticky; top:0; z-index:20; height:58px; margin:0 -24px 0;
+  background:rgba(247,246,255,0.92); backdrop-filter:blur(16px);
+  border-bottom:0.5px solid var(--border);
+}
+.ss-nav-inner {
+  max-width:var(--max); height:100%; margin:0 auto; padding:0 36px;
+  display:flex; align-items:center; justify-content:space-between; gap:20px;
+}
+.brand { display:flex; align-items:center; gap:10px; text-decoration:none; }
+.brand-mark {
+  width:30px; height:30px; background:var(--p600); border-radius:8px;
+  display:grid; place-items:center; position:relative; overflow:hidden;
+}
+.brand-mark::before {
+  content:''; position:absolute; width:18px; height:18px; border-radius:50%;
+  border:2px solid rgba(255,255,255,0.9); animation:sonar 2.4s ease-out infinite;
+}
+.brand-mark::after { content:''; width:6px; height:6px; background:white; border-radius:50%; z-index:1; }
+@keyframes sonar { 0%{transform:scale(.3);opacity:1} 100%{transform:scale(1.6);opacity:0} }
+.brand-name { font-size:15px; font-weight:500; color:var(--text); }
+.brand-name span { color:var(--p600); }
+.nav-links { display:flex; gap:22px; align-items:center; }
+.nav-links a { font-size:13px; color:var(--muted); text-decoration:none; transition:color .2s; }
+.nav-links a:hover { color:var(--p600); }
+.nav-btn {
+  background:var(--p600); color:white !important; padding:8px 18px; border-radius:40px;
+  font-size:13px; font-weight:500; text-decoration:none; transition:background .2s, transform .1s;
+}
+.nav-btn:hover { background:var(--p800); transform:translateY(-1px); }
+
+.hero {
+  margin:0 -24px; padding:80px 36px 68px;
+  background:linear-gradient(150deg,#eceaff 0%,#ede8ff 35%,#e5eeff 70%,#eaf4ff 100%);
+  border-bottom:0.5px solid var(--border);
+}
+.hero-inner { max-width:var(--max); margin:0 auto; }
+.pill {
+  display:inline-flex; align-items:center; gap:7px; font-size:12px; font-weight:500;
+  letter-spacing:.06em; text-transform:uppercase; color:var(--p600);
+  background:rgba(255,255,255,.55); border:0.5px solid rgba(83,74,183,.16);
+  padding:6px 14px; border-radius:40px; margin-bottom:22px;
+}
+.hero h1 {
+  font-family:'DM Serif Display', Georgia, serif; font-size:56px; line-height:1.05;
+  font-weight:400; color:var(--text); max-width:690px; margin:0 0 20px;
+  letter-spacing:0;
+}
+.hero h1 em { font-style:italic; color:var(--p600); }
+.hero-sub { font-size:17px; color:var(--muted); max-width:610px; line-height:1.75; margin:0 0 36px; }
+.hero-btns { display:flex; gap:12px; flex-wrap:wrap; margin-bottom:52px; }
+.btn-p, .btn-s {
+  border-radius:40px; padding:14px 26px; font-size:15px; font-weight:500;
+  text-decoration:none; display:inline-flex; align-items:center; gap:8px; transition:transform .15s, background .2s;
+}
+.btn-p { background:var(--p600); color:white !important; }
+.btn-p:hover { background:var(--p800); transform:translateY(-2px); }
+.btn-s { background:white; color:var(--text) !important; border:0.5px solid var(--border); }
+.btn-s:hover { background:#f0efff; transform:translateY(-2px); }
+.hero-stats {
+  display:grid; grid-template-columns:repeat(4, minmax(0,1fr)); gap:30px;
+  padding-top:30px; border-top:0.5px solid rgba(83,74,183,0.18);
+}
+.stat-n { font-family:'DM Serif Display', Georgia, serif; font-size:32px; color:var(--p600); line-height:1.1; }
+.stat-l { font-size:13px; color:var(--muted); margin-top:3px; }
+
+.section { padding:70px 0; }
+.sec-wrap { max-width:var(--max); margin:0 auto; }
+.sec-label {
+  font-size:12px; font-weight:500; letter-spacing:.07em; text-transform:uppercase;
+  color:var(--p600); margin-bottom:10px;
+}
+.sec-title {
+  font-family:'DM Serif Display', Georgia, serif; font-size:38px; line-height:1.14;
+  font-weight:400; margin:0 0 14px; color:var(--text);
+}
+.sec-body { font-size:15px; color:var(--muted); line-height:1.75; max-width:620px; margin:0 0 34px; }
+
+.pipeline-steps { background:rgba(255,255,255,.45); border:0.5px solid var(--border); border-radius:var(--rxl); padding:16px 32px; }
+.pipe-step { display:grid; grid-template-columns:48px 1fr; gap:0 24px; align-items:start; padding:28px 0; border-bottom:0.5px solid var(--border); }
+.pipe-step:last-child { border-bottom:none; }
+.pipe-num-col { display:flex; flex-direction:column; align-items:center; }
+.pipe-num { width:40px; height:40px; border-radius:50%; display:grid; place-items:center; font-size:15px; font-weight:500; flex-shrink:0; }
+.num-1 { background:var(--p50); color:var(--p600); } .num-2 { background:var(--teal50); color:var(--teal600); } .num-3 { background:var(--amb50); color:var(--amb600); }
+.pipe-line { width:1px; flex:1; background:var(--border); margin-top:8px; min-height:40px; }
+.pipe-step:last-child .pipe-line { display:none; }
+.pipe-tag { display:inline-block; font-size:11px; font-weight:500; letter-spacing:.05em; text-transform:uppercase; padding:3px 10px; border-radius:20px; margin-bottom:8px; }
+.tag-p { background:var(--p50); color:var(--p600); } .tag-t { background:var(--teal50); color:var(--teal600); } .tag-a { background:var(--amb50); color:var(--amb600); }
+.pipe-title { font-size:19px; font-weight:500; margin-bottom:6px; font-family:'DM Serif Display', Georgia, serif; color:var(--text); }
+.pipe-desc { font-size:14px; color:var(--muted); line-height:1.7; margin:0 0 12px; }
+.pipe-tags { display:flex; flex-wrap:wrap; gap:6px; }
+.ex-tag { font-size:12px; padding:4px 12px; border-radius:20px; background:white; border:0.5px solid var(--border); color:var(--muted); }
+
+.dashboard-section { padding:0 0 76px; }
+.dash-outer { background:var(--dark); border-radius:var(--rxl); padding:46px; box-shadow:0 24px 80px rgba(18,17,42,.18); }
+.dash-source-row { display:flex; align-items:center; justify-content:space-between; gap:16px; margin-bottom:28px; flex-wrap:wrap; }
+.source-badge, .live-badge {
+  display:inline-flex; align-items:center; gap:8px; background:rgba(255,255,255,0.055);
+  border:0.5px solid rgba(255,255,255,0.1); border-radius:40px; padding:8px 16px;
+  font-size:13px; color:#bbb;
+}
+.source-badge strong { color:white; font-weight:500; }
+.live-dot { width:7px; height:7px; border-radius:50%; background:var(--grn400); animation:blink 1.4s infinite; }
+@keyframes blink { 0%,100%{opacity:1} 50%{opacity:.28} }
+.dash-title-block .sec-label { color:var(--p200); }
+.dash-title-block .sec-title { color:white; margin-bottom:4px; }
+.dash-sub { font-size:13px; color:#77729a; margin-bottom:28px; }
+.prob-grid { display:grid; grid-template-columns:repeat(4, minmax(0,1fr)); gap:14px; }
+.prob-card {
+  background:#2e2c50; border-radius:var(--rlg); padding:20px;
+  border:0.5px solid rgba(255,255,255,0.07); transition:background .2s, transform .15s;
+  min-height:224px;
+}
+.prob-card:hover { background:#353270; transform:translateY(-2px); }
+.pc-top { display:flex; align-items:flex-start; justify-content:space-between; gap:8px; margin-bottom:12px; }
+.pc-name { font-size:14px; font-weight:500; color:#e8e6ff; line-height:1.35; }
+.pc-status { font-size:10px; font-weight:500; padding:3px 9px; border-radius:20px; white-space:nowrap; }
+.st-crit { background:rgba(226,75,74,.25); color:#ff9898; }
+.st-high { background:rgba(239,159,39,.25); color:#ffd080; }
+.st-mid { background:rgba(99,153,34,.25); color:#a8e05f; }
+.st-new { background:rgba(175,169,236,.2); color:#c8c3f8; }
+.pc-pct { font-size:30px; font-weight:400; color:white; font-family:'DM Serif Display', Georgia, serif; margin-bottom:2px; }
+.pc-delta { font-size:11px; margin-bottom:14px; color:#a8a6c8; line-height:1.5; }
+.signal-meter { height:42px; display:flex; align-items:flex-end; gap:4px; margin-bottom:14px; }
+.signal-meter span { flex:1; border-radius:5px 5px 2px 2px; background:linear-gradient(180deg, #AFA9EC, #534AB7); opacity:.95; min-height:6px; }
+.pc-keywords { display:flex; flex-wrap:wrap; gap:4px; }
+.kw { font-size:10px; background:rgba(255,255,255,0.06); color:#bbb8dc; padding:2px 8px; border-radius:20px; }
+
+.cluster-panel {
+  background:white; border-radius:var(--rxl); padding:56px 48px;
+  border:0.5px solid var(--border); box-shadow:0 16px 60px rgba(83,74,183,.08);
+}
+.cl-flow-row {
+  display:flex; align-items:center; gap:0; margin:28px 0 34px; background:var(--p50);
+  border-radius:var(--rlg); padding:18px 24px; border:0.5px solid var(--border);
+}
+.cl-flow-step { text-align:center; flex:1; }
+.cl-flow-icon { font-size:20px; color:var(--p600); margin-bottom:6px; }
+.cl-flow-label { font-size:12px; font-weight:500; color:var(--text); margin-bottom:2px; }
+.cl-flow-sub { font-size:11px; color:var(--light); line-height:1.4; }
+.cl-flow-arrow { color:var(--p100); font-size:22px; flex-shrink:0; padding:0 8px; }
+.legend-row {
+  display:flex; flex-wrap:wrap; gap:10px; margin-bottom:20px; padding:14px 18px;
+  background:#faf9ff; border-radius:var(--rmd); border:0.5px solid var(--border); align-items:center;
+}
+.legend-label { font-size:11px; font-weight:500; text-transform:uppercase; letter-spacing:.06em; color:var(--light); margin-right:4px; }
+.legend-item { display:flex; align-items:center; gap:5px; font-size:12px; color:var(--muted); }
+.cluster-grid { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+.cl-card { background:white; border-radius:var(--rlg); border:1px solid #e8e6ff; overflow:hidden; transition:box-shadow .2s, transform .15s; }
+.cl-card:hover { box-shadow:0 8px 32px rgba(83,74,183,.12); transform:translateY(-2px); }
+.cl-stripe { height:4px; width:100%; }
+.stripe-crit { background:linear-gradient(90deg,#E24B4A,#f09090); }
+.stripe-high { background:linear-gradient(90deg,#EF9F27,#f7cc80); }
+.stripe-mid { background:linear-gradient(90deg,#639922,#a0cc60); }
+.stripe-emg { background:linear-gradient(90deg,var(--p600),var(--p200)); }
+.cl-card-inner { padding:22px; }
+.cl-top { display:flex; align-items:flex-start; justify-content:space-between; gap:10px; margin-bottom:4px; }
+.cl-name { font-size:15px; font-weight:500; color:var(--text); }
+.cl-count { font-size:12px; color:var(--light); margin-bottom:16px; }
+.cl-signal-badge { font-size:10px; font-weight:500; padding:3px 10px; border-radius:20px; flex-shrink:0; }
+.sig-crit { background:var(--red50); color:var(--red600); }
+.sig-high { background:var(--amb50); color:var(--amb600); }
+.sig-mid { background:var(--grn50); color:var(--grn600); }
+.sig-emg { background:var(--p50); color:var(--p600); }
+.cl-sources-label { font-size:10px; font-weight:500; text-transform:uppercase; letter-spacing:.06em; color:var(--light); margin-bottom:7px; }
+.cl-sources { display:flex; flex-wrap:wrap; gap:5px; margin-bottom:16px; }
+.cl-src-tag { font-size:11px; background:#f4f3ff; color:var(--p600); padding:3px 11px; border-radius:20px; border:0.5px solid #d8d4f8; font-weight:500; }
+.cl-diagnosis { background:var(--text); border-radius:var(--rmd); padding:16px 18px; margin-bottom:14px; }
+.cl-diag-label { font-size:10px; font-weight:500; text-transform:uppercase; letter-spacing:.07em; color:var(--p200); margin-bottom:8px; display:flex; align-items:center; gap:4px; }
+.cl-diag-text { font-size:13px; color:#e0defc; line-height:1.65; }
+.cl-overlap { font-size:11px; color:var(--light); display:flex; align-items:center; gap:5px; line-height:1.45; }
+
+.stakeholder-section { background:#f4f3ff; border-radius:var(--rxl); padding:56px 48px; margin-top:24px; }
+.sh-overview-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin-bottom:28px; }
+.sh-ov-card { background:white; border:0.5px solid var(--border); border-radius:var(--rlg); padding:18px; border-top:3px solid transparent; transition:box-shadow .2s, transform .15s; }
+.sh-ov-card:hover { box-shadow:0 4px 20px rgba(83,74,183,.1); transform:translateY(-1px); }
+.sh-ov-card.active { border-top-color:var(--p600); box-shadow:0 4px 20px rgba(83,74,183,.15); }
+.sh-ov-icon { font-size:20px; color:var(--p600); margin-bottom:8px; }
+.sh-ov-name { font-size:14px; font-weight:500; margin-bottom:4px; color:var(--text); }
+.sh-ov-role { font-size:12px; color:var(--muted); margin-bottom:10px; line-height:1.45; min-height:52px; }
+.sh-ov-badges { display:flex; flex-wrap:wrap; gap:4px; }
+.badge { font-size:11px; padding:3px 10px; border-radius:20px; font-weight:500; }
+.b-h { background:var(--blue50); color:var(--blue600); }
+.b-s { background:var(--coral50); color:var(--coral600); }
+.b-f { background:var(--amb50); color:var(--amb600); }
+.b-l { background:var(--p50); color:var(--p600); }
+.b-i { background:var(--pink50); color:var(--pink600); }
+.b-g { background:var(--grn50); color:var(--grn600); }
+.sh-occ { display:flex; align-items:center; gap:5px; font-size:11px; margin-top:10px; color:var(--muted); }
+.occ-dot { width:6px; height:6px; border-radius:50%; background:var(--amb400); }
+.occ-open { background:var(--grn400); }
+
+.ai-section { padding:0 0 76px; }
+.ai-box { background:var(--p50); border-radius:var(--rxl); padding:36px; border:0.5px solid var(--border); }
+.ai-result { background:white; border:0.5px solid #ddd; border-radius:var(--rlg); padding:24px; font-size:14px; line-height:1.7; color:#333; }
+.ai-kicker { font-size:11px; font-weight:500; text-transform:uppercase; letter-spacing:.06em; color:var(--p600); margin-bottom:6px; }
+.ai-name { font-family:'DM Serif Display', Georgia, serif; font-size:28px; line-height:1.15; color:var(--text); margin-bottom:12px; }
+.ai-meta { display:flex; flex-wrap:wrap; gap:6px; margin:10px 0 18px; }
+.ai-meta span { font-size:11px; background:#f4f3ff; color:var(--p600); border:0.5px solid #d8d4f8; border-radius:20px; padding:3px 10px; }
+.ai-steps { margin:8px 0 0; padding-left:18px; }
+.ai-steps li { margin-bottom:5px; }
+.ai-summary { background:white; border:0.5px solid #ddd; border-radius:var(--rlg); padding:20px 22px; color:var(--muted); font-size:14px; line-height:1.7; margin-bottom:14px; }
+.innovation-grid { display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:14px; }
+.innovation-card { background:white; border:0.5px solid #ddd; border-radius:var(--rlg); padding:22px; font-size:14px; line-height:1.65; color:#333; }
+.innovation-card .ai-name { font-size:24px; }
+.innovation-card p { margin:0 0 10px; }
+.empty-state { background:white; border:0.5px dashed #c9c4ef; border-radius:var(--rlg); padding:22px; color:var(--muted); font-size:14px; line-height:1.65; }
+
+.data-lab {
+  background:white; border:0.5px solid var(--border); border-radius:var(--rxl); padding:26px;
+  margin-bottom:26px; box-shadow:0 8px 36px rgba(83,74,183,.06);
+}
+.status-grid { display:grid; grid-template-columns:repeat(5, minmax(0,1fr)); gap:10px; margin:16px 0 24px; }
+.status-card { background:#faf9ff; border:0.5px solid var(--border); border-radius:var(--rmd); padding:14px; }
+.status-top { display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:8px; }
+.status-dot { width:8px; height:8px; border-radius:50%; display:inline-block; }
+.status-num { font-family:'DM Serif Display', Georgia, serif; font-size:28px; color:var(--text); line-height:1; }
+.status-label { font-size:12px; font-weight:500; color:var(--text); margin-bottom:2px; }
+.status-copy { font-size:11px; color:var(--muted); line-height:1.35; }
+.record-card { border-bottom:0.5px solid var(--border); padding:16px 0; }
+.record-card:last-child { border-bottom:none; }
+.record-meta { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:8px; }
+.record-pill { font-size:11px; padding:3px 9px; border-radius:20px; background:var(--p50); color:var(--p600); font-weight:500; }
+.record-title { font-size:14px; color:var(--text); line-height:1.5; margin-bottom:8px; }
+.record-json { background:#12112a; color:#d8d4f8; border-radius:var(--rmd); padding:12px 14px; font-size:12px; line-height:1.6; overflow:auto; }
+
+.ss-footer { background:var(--dark); border-radius:var(--rxl) var(--rxl) 0 0; margin-top:24px; padding:36px 44px; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:16px; }
+.footer-brand { color:white; font-size:15px; font-weight:500; }
+.footer-txt { font-size:13px; color:#77729a; }
+
+.stTabs [data-baseweb="tab-list"] { gap:18px; border-bottom:0.5px solid var(--border); }
+.stTabs [data-baseweb="tab"] { color:var(--muted); font-size:13px; }
+.stTabs [aria-selected="true"] { color:var(--p600) !important; }
+.stAlert { border-radius:var(--rmd); }
+
+@media(max-width:900px) {
+  .nav-links { display:none; }
+  .hero h1 { font-size:40px; }
+  .hero-stats, .prob-grid, .cluster-grid, .sh-overview-grid, .status-grid, .innovation-grid { grid-template-columns:1fr 1fr; }
+  .dash-outer, .cluster-panel, .stakeholder-section { padding:32px 22px; }
+}
+@media(max-width:620px) {
+  .block-container { padding-left:14px !important; padding-right:14px !important; }
+  .ss-nav, .hero { margin-left:-14px; margin-right:-14px; }
+  .ss-nav-inner { padding:0 18px; }
+  .hero { padding:58px 24px 44px; }
+  .hero h1 { font-size:34px; }
+  .hero-stats, .prob-grid, .cluster-grid, .sh-overview-grid, .status-grid, .innovation-grid { grid-template-columns:1fr; }
+  .pipeline-steps { padding:8px 18px; }
+  .pipe-step { grid-template-columns:38px 1fr; gap:0 16px; }
+  .cl-flow-row { display:grid; grid-template-columns:1fr; gap:10px; }
+  .cl-flow-arrow { display:none; }
+}
+</style>
+"""
+
+
+def esc(value) -> str:
+    return html.escape(str(value or ""), quote=True)
+
+
+def render_html(markup: str) -> None:
+    markup = dedent(str(markup)).strip()
+    if hasattr(st, "html"):
+        st.html(markup)
+    else:
+        st.markdown(markup, unsafe_allow_html=True)
+
+
+def one_line(value, limit=220) -> str:
+    text = " ".join(str(value or "").split())
+    if len(text) <= limit:
+        return text
+    return text[: limit - 1].rstrip() + "..."
+
+
+def parse_json(value) -> dict:
+    if not value:
+        return {}
+    try:
+        parsed = json.loads(value)
+        return parsed if isinstance(parsed, dict) else {}
+    except json.JSONDecodeError:
+        return {}
+
+
+def status_as_int(value) -> int:
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return 0
+
+
+def normalize_cluster(raw_cluster, cleaned_content="") -> str:
+    raw = str(raw_cluster or "").strip()
+    if raw in CLUSTER_META:
+        return raw
+    haystack = f"{raw} {cleaned_content or ''}".lower()
+    if any(token in haystack for token in ["finanz", "baf", "geld", "miete zahlen"]):
+        return "Finanzen"
+    if any(token in haystack for token in ["mental", "psy", "depression", "angst", "stress"]):
+        return "Mentale Gesundheit"
+    if any(token in haystack for token in ["studium", "pruf", "pruef", "modul", "semester", "uni"]):
+        return "Studium"
+    if any(token in haystack for token in ["wohn", "wg", "zimmer", "kaution"]):
+        return "Wohnen"
+    return raw or "Sonstiges"
+
+
+def urgency_label(urgency_counts: Counter, total: int) -> tuple[str, str, str]:
+    high = urgency_counts.get("Hoch", 0)
+    mid = urgency_counts.get("Mittel", 0)
+    if total == 0:
+        return "Emerging", "st-new", "stripe-emg"
+    if high / total >= 0.28 or high >= 8:
+        return "Kritisch", "st-crit", "stripe-crit"
+    if high or mid / total >= 0.55:
+        return "Hoch", "st-high", "stripe-high"
+    if mid:
+        return "Mittel", "st-mid", "stripe-mid"
+    return "Emerging", "st-new", "stripe-emg"
+
+
+def signal_bars(percent: int, index: int) -> str:
+    base = max(12, min(percent, 96))
+    pattern = [
+        max(8, base - 22 + index * 2),
+        max(10, base - 16),
+        max(12, base - 7 + (index % 3) * 3),
+        max(14, base - 2),
+        max(16, base + 5),
+        max(18, base + 12),
+    ]
+    return "".join(f'<span style="height:{min(96, value)}%"></span>' for value in pattern)
+
+
+def stakeholder_role(name: str) -> str:
+    lowered = name.lower()
+    if "baf" in lowered:
+        return "Owns financial aid processes and the paperwork experience around student funding."
+    if "studierendenwerk" in lowered or "studentenwerk" in lowered:
+        return "Connects housing, social counselling and financial support in the student service layer."
+    if "psych" in lowered or "beratung" in lowered:
+        return "Handles psychosocial counselling and low-threshold support for vulnerable students."
+    if "hochschule" in lowered or "universit" in lowered:
+        return "Coordinates campus services, onboarding, study advice and institutional escalation paths."
+    if "krankenkasse" in lowered:
+        return "Can connect health insurance processes with mental health and hardship support."
+    if "ministerium" in lowered or "regierung" in lowered or "amt" in lowered:
+        return "Shapes structural rules, resources and administrative access conditions."
+    return "Appears repeatedly in analyzed posts and should be considered in service design workshops."
+
+
+def stakeholder_badge_class(name: str) -> str:
+    lowered = name.lower()
+    if "baf" in lowered or "finanz" in lowered:
+        return "b-f"
+    if "psych" in lowered or "beratung" in lowered:
+        return "b-s"
+    if "werk" in lowered or "wohn" in lowered:
+        return "b-h"
+    if "univers" in lowered or "hochschule" in lowered:
+        return "b-g"
+    if "amt" in lowered or "regierung" in lowered:
+        return "b-l"
+    return "b-i"
+
+
+@st.cache_data(ttl=20, show_spinner=False)
+def load_data():
+    if not DB_FILE.exists():
+        return [], []
     try:
         conn = sqlite3.connect(DB_FILE)
-        cursor = conn.cursor()
-        cursor.execute("SELECT id, raw_content, cleaned_content, analysis_json FROM forum_posts WHERE status = ? ORDER BY id DESC LIMIT ?", (status_code, limit))
-        data = cursor.fetchall()
+        conn.row_factory = sqlite3.Row
+        records = [
+            dict(row)
+            for row in conn.execute(
+                """
+                SELECT id, url, raw_content, cleaned_content, analysis_json, status
+                FROM forum_posts
+                ORDER BY id DESC
+                """
+            ).fetchall()
+        ]
+        reports = [
+            dict(row)
+            for row in conn.execute(
+                """
+                SELECT id, created_at, report_json
+                FROM system_reports
+                ORDER BY id DESC
+                """
+            ).fetchall()
+        ]
         conn.close()
-        return data
-    except sqlite3.OperationalError:
-        return []
+        return records, reports
+    except sqlite3.Error:
+        return [], []
 
-# =====================================================================
-# 4. Header UI
-# =====================================================================
-st.markdown("""<div class="dash-header">
-<div>
-    <div class="dash-subtitle">SYSTEM OPERATIONS COMMAND</div>
-    <div class="dash-title">Service Sonar</div>
-</div>
-<div class="status-indicator">
-    <div class="pulse-dot"></div> SYSTEM ONLINE
-</div>
-</div>""", unsafe_allow_html=True)
 
-# =====================================================================
-# 5. Interaktive Tabs
-# =====================================================================
-tab1, tab2, tab3, tab4 = st.tabs([
-    "Deep Scraper (Agent 1)", 
-    "Cleaner (Agent 2)", 
-    "Analyzer (Agent 3)", 
-    "Innovator Dashboard"
-])
+def build_analytics(records):
+    analyses = []
+    for row in records:
+        if status_as_int(row.get("status")) != 2:
+            continue
+        data = parse_json(row.get("analysis_json"))
+        cluster = normalize_cluster(data.get("problem_cluster"), row.get("cleaned_content"))
+        urgency = str(data.get("urgency") or "Niedrig")
+        tone = str(data.get("emotional_tone") or "Neutral")
+        stakeholders = data.get("stakeholders") if isinstance(data.get("stakeholders"), list) else []
+        analyses.append(
+            {
+                "row": row,
+                "data": data,
+                "cluster": cluster,
+                "urgency": urgency,
+                "tone": tone,
+                "stakeholders": [str(item) for item in stakeholders if item],
+            }
+        )
 
-# --- Tab 1: Rohdaten ---
-with tab1:
-    st.markdown('<div class="sec-label" style="margin-top:0;">Raw Data Stream (DOM Extraction)</div>', unsafe_allow_html=True)
-    raw_records = get_db_records(0, 5)
-    if not raw_records:
-        st.info("Keine Rohdaten (Status 0) vorhanden. Bitte Agent 1 ausführen.")
-    else:
-        for db_id, raw_text, _, _ in raw_records:
-            st.markdown(f"""<div class="console-box">
-<div class="console-header"><span>STREAM_ID: {db_id}</span><span>STATUS: 0</span></div>
-<div style="color: #d4d4d8;">{raw_text[:300]}...</div>
-</div>""", unsafe_allow_html=True)
+    groups = defaultdict(list)
+    stakeholder_counts = Counter()
+    urgency_counts = Counter()
+    tone_counts = Counter()
 
-# --- Tab 2: Bereinigte Daten ---
-with tab2:
-    st.markdown('<div class="sec-label" style="margin-top:0;">Privacy & Noise Reduction Filter</div>', unsafe_allow_html=True)
-    cleaned_records = get_db_records(1, 5)
-    if not cleaned_records:
-        st.info("Keine bereinigten Daten (Status 1) vorhanden. Bitte Agent 2 ausführen.")
-    else:
-        for db_id, _, cleaned_text, _ in cleaned_records:
-            st.markdown(f"""<div class="console-box" style="border-color: #064e3b; background: rgba(6,78,59,0.1);">
-<div class="console-header" style="border-color: #064e3b; color: #10b981;"><span>STREAM_ID: {db_id}</span><span>STATUS: 1 [CLEAN]</span></div>
-<div style="color: #a1a1aa;">{cleaned_text}</div>
-</div>""", unsafe_allow_html=True)
+    for item in analyses:
+        groups[item["cluster"]].append(item)
+        urgency_counts[item["urgency"]] += 1
+        tone_counts[item["tone"]] += 1
+        stakeholder_counts.update(item["stakeholders"])
 
-# --- Tab 3: Semantische Analyse ---
-with tab3:
-    st.markdown('<div class="sec-label" style="margin-top:0;">Vector Space Mapping & Structuring</div>', unsafe_allow_html=True)
-    analyzed_records = get_db_records(2, 5)
-    if not analyzed_records:
-        st.info("Keine analysierten Daten (Status 2) vorhanden. Bitte Agent 3 ausführen.")
-    else:
-        for db_id, _, cleaned_text, json_str in analyzed_records:
-            st.markdown(f"""<div class="console-box" style="border-left: 2px solid #6366f1;">
-<div class="console-header"><span>TARGET_ID: {db_id}</span><span>STATUS: 2 [MAPPED]</span></div>
-<div style="margin-bottom: 12px; color: #d4d4d8;">{cleaned_text}</div>
-<div style="background: #000; padding: 10px; border-radius: 4px; color: #38bdf8;">{json_str}</div>
-</div>""", unsafe_allow_html=True)
+    return analyses, groups, stakeholder_counts, urgency_counts, tone_counts
 
-# --- Tab 4: Dynamisches Innovator Dashboard ---
-with tab4:
-    # Dynamische Berechnung der Anomalien aus Agent 3
-    all_analyzed = get_db_records(2, 500)
-    signal_count = len(all_analyzed) if all_analyzed else 0
 
-    # Holt den aktuellsten generierten Bericht von Agent 4 aus der Datenbank
-    try:
-        conn = sqlite3.connect(DB_FILE)
-        cursor = conn.cursor()
-        cursor.execute("SELECT report_json FROM system_reports ORDER BY id DESC LIMIT 1")
-        report_row = cursor.fetchone()
-        conn.close()
-    except sqlite3.OperationalError:
-        report_row = None
-
-    if not report_row:
-        st.warning("Noch kein LLM-Innovationsbericht generiert. Bitte Agent 4 ausführen.")
-    else:
-        try:
-            # Parsen der LLM JSON-Antwort von Agent 4
-            ai_insight = json.loads(report_row[0])
-            
-            col1, col2 = st.columns([1, 2.5], gap="large")
-
-            with col1:
-                st.markdown(f"""<div class="bento-card">
-<div class="metric-value">{signal_count}</div>
-<div class="metric-label">Anomalies Detected</div>
-<div class="sec-label">Data Origin</div>
-<div class="main-text" style="font-size: 13px; font-family: 'JetBrains Mono', monospace;">Live aus SQLite Datenbank<br>Status: 2 (Verifiziert)</div>
-</div>""", unsafe_allow_html=True)
-
-            with col2:
-                st.markdown(f"""<div class="bento-card bento-card-glow">
-<div class="sec-label" style="margin-top: 0;">Emergent Vector Cluster (KI-Analysiert)</div>
-<div class="highlight">{ai_insight.get('cluster', 'N/A')}</div>
-
-<div class="sec-label">Synthesized Service Opportunity (LLM-Generiert)</div>
-<div class="highlight" style="color: #ffffff; font-size: 24px;">{ai_insight.get('opportunity', 'N/A')}</div>
-
-<div class="sec-label">Architecture / Concept</div>
-<div class="main-text">{ai_insight.get('solution', 'N/A')}</div>
-
-<div style="display: flex; gap: 60px; margin-top: 30px; border-top: 1px solid #27272a; padding-top: 20px;">
-    <div>
-        <div class="sec-label" style="margin-top: 0;">Target Group</div>
-        <div class="main-text" style="font-size: 14px;">{ai_insight.get('target', 'N/A')}</div>
+def render_nav():
+    render_html(
+        """
+<div class="ss-nav">
+  <div class="ss-nav-inner">
+    <a class="brand" href="#">
+      <div class="brand-mark"></div>
+      <span class="brand-name">Service <span>Sonar</span></span>
+    </a>
+    <div class="nav-links">
+      <a href="#pipeline">Pipeline</a>
+      <a href="#dashboard">Signale</a>
+      <a href="#cluster">Clustering</a>
+      <a href="#stakeholder">Stakeholder</a>
+      <a class="nav-btn" href="#innovation">Innovation</a>
     </div>
-    <div>
-        <div class="sec-label" style="margin-top: 0;">System Owner / Stakeholder</div>
-        <div class="main-text" style="font-size: 14px;">{ai_insight.get('stakeholder', 'N/A')}</div>
-    </div>
+  </div>
 </div>
-</div>""", unsafe_allow_html=True)
-        except json.JSONDecodeError:
-            st.error("Fehler beim Parsen der LLM-Antwort. Ungültiges JSON-Format.")
+"""
+    )
+
+
+def render_hero(total_records, analyzed_count, cluster_count, urgent_count):
+    render_html(
+        f"""
+<div class="hero">
+  <div class="hero-inner">
+    <div class="pill"><i class="ti ti-radar"></i> Social Intelligence Platform</div>
+    <h1>Versteckte soziale Bed&uuml;rfnisse <em>sichtbar</em> machen</h1>
+    <p class="hero-sub">Service Sonar erkennt schwache Signale aus studentischen Quellen, strukturiert sie mit KI und macht daraus eine Entscheidungsgrundlage f&uuml;r bessere Services.</p>
+    <div class="hero-btns">
+      <a class="btn-p" href="#dashboard"><i class="ti ti-layout-dashboard"></i> Dashboard &ouml;ffnen</a>
+      <a class="btn-s" href="#pipeline"><i class="ti ti-route"></i> Pipeline ansehen</a>
+    </div>
+    <div class="hero-stats">
+      <div><div class="stat-n">{total_records}</div><div class="stat-l">Quellen in SQLite</div></div>
+      <div><div class="stat-n">{analyzed_count}</div><div class="stat-l">LLM-analysierte Texte</div></div>
+      <div><div class="stat-n">{cluster_count}</div><div class="stat-l">Aktive Problemcluster</div></div>
+      <div><div class="stat-n">{urgent_count}</div><div class="stat-l">High-urgency Signale</div></div>
+    </div>
+  </div>
+</div>
+"""
+    )
+
+
+def render_pipeline(status_counts):
+    raw_count = status_counts.get(0, 0)
+    clean_count = status_counts.get(1, 0)
+    analyzed_count = status_counts.get(2, 0)
+    review_count = status_counts.get(3, 0)
+    render_html(
+        f"""
+<section class="section" id="pipeline">
+  <div class="sec-wrap">
+    <div class="sec-label">Was Service Sonar leistet</div>
+    <h2 class="sec-title">Drei Schritte von Daten zur Innovation</h2>
+    <p class="sec-body">Die Streamlit-Version folgt dem Look des HTML-Prototyps, liest aber live aus der lokalen SQLite-Datenbank.</p>
+    <div class="pipeline-steps">
+      <div class="pipe-step">
+        <div class="pipe-num-col"><div class="pipe-num num-1">1</div><div class="pipe-line"></div></div>
+        <div>
+          <span class="pipe-tag tag-p">Weak Signal Detection</span>
+          <div class="pipe-title">Crawler extracts recurring pain patterns</div>
+          <p class="pipe-desc">Agent 1 sammelt Forumtexte und legt sie als Rohsignale ab. Aktuell warten <strong>{raw_count}</strong> neue Rohposts im Intake.</p>
+          <div class="pipe-tags"><span class="ex-tag">Forum-Crawler</span><span class="ex-tag">SQLite Intake</span><span class="ex-tag">Source Deduplication</span></div>
+        </div>
+      </div>
+      <div class="pipe-step">
+        <div class="pipe-num-col"><div class="pipe-num num-2">2</div><div class="pipe-line"></div></div>
+        <div>
+          <span class="pipe-tag tag-t">Privacy & Clustering</span>
+          <div class="pipe-title">Cleaner prepares posts for semantic analysis</div>
+          <p class="pipe-desc">Agent 2 anonymisiert, filtert irrelevante Inhalte und markiert sensible F&auml;lle. <strong>{clean_count}</strong> Beitr&auml;ge sind bereinigt, <strong>{review_count}</strong> warten auf Human Review.</p>
+          <div class="pipe-tags"><span class="ex-tag">Anonymisierung</span><span class="ex-tag">Relevanzfilter</span><span class="ex-tag">Human-in-the-loop</span></div>
+        </div>
+      </div>
+      <div class="pipe-step">
+        <div class="pipe-num-col"><div class="pipe-num num-3">3</div><div class="pipe-line"></div></div>
+        <div>
+          <span class="pipe-tag tag-a">Service Innovation Output</span>
+          <div class="pipe-title">LLM maps signals to stakeholders and opportunities</div>
+          <p class="pipe-desc">Agent 3 hat <strong>{analyzed_count}</strong> Beitr&auml;ge strukturiert. Agent 4 kann daraus einen verdichteten Service-Innovationsbericht erzeugen.</p>
+          <div class="pipe-tags"><span class="ex-tag">LLM JSON</span><span class="ex-tag">Stakeholder Mapping</span><span class="ex-tag">Decision Support</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+"""
+    )
+
+
+def render_problem_dashboard(groups, analyzed_count):
+    cards = []
+    sorted_groups = sorted(groups.items(), key=lambda item: len(item[1]), reverse=True)
+    for index, (cluster, items) in enumerate(sorted_groups[:8]):
+        meta = CLUSTER_META.get(cluster, CLUSTER_META["Sonstiges"])
+        count = len(items)
+        percent = round((count / analyzed_count) * 100) if analyzed_count else 0
+        urgency_counts = Counter(item["urgency"] for item in items)
+        label, status_class, _ = urgency_label(urgency_counts, count)
+        keywords = meta["keywords"][:]
+        stakeholder_counts = Counter()
+        for item in items:
+            stakeholder_counts.update(item["stakeholders"])
+        for stakeholder, _ in stakeholder_counts.most_common(2):
+            clean = esc(stakeholder)
+            if clean not in keywords:
+                keywords.append(clean)
+        keyword_html = "".join(f'<span class="kw">{kw}</span>' for kw in keywords[:5])
+        bars = signal_bars(percent, index)
+        cards.append(
+            f"""
+      <div class="prob-card">
+        <div class="pc-top"><span class="pc-name">{meta["display"]}</span><span class="pc-status {status_class}">{label}</span></div>
+        <div class="pc-pct">{percent}%</div>
+        <div class="pc-delta">{count} LLM-analysierte Beitr&auml;ge in diesem Cluster</div>
+        <div class="signal-meter">{bars}</div>
+        <div class="pc-keywords">{keyword_html}</div>
+      </div>
+"""
+        )
+
+    if not cards:
+        cards.append(
+            """
+      <div class="prob-card">
+        <div class="pc-top"><span class="pc-name">Noch keine analysierten Signale</span><span class="pc-status st-new">Pending</span></div>
+        <div class="pc-pct">0%</div>
+        <div class="pc-delta">Agent 3 hat noch keine Beitr&auml;ge strukturiert.</div>
+        <div class="signal-meter"><span style="height:8%"></span><span style="height:8%"></span><span style="height:8%"></span><span style="height:8%"></span></div>
+        <div class="pc-keywords"><span class="kw">Waiting for analysis</span></div>
+      </div>
+"""
+        )
+
+    render_html(
+        f"""
+<section class="dashboard-section" id="dashboard">
+  <div class="dash-outer">
+    <div class="dash-source-row">
+      <div class="source-badge"><i class="ti ti-database" style="font-size:14px;color:var(--p200)"></i><strong>{analyzed_count} Quellen analysiert</strong></div>
+      <div class="live-badge"><div class="live-dot"></div>Live SQLite Monitoring</div>
+    </div>
+    <div class="dash-title-block">
+      <div class="sec-label">Aktuelles Problem-Dashboard</div>
+      <h2 class="sec-title">Top-Signale aus Service Sonar</h2>
+      <div class="dash-sub">Cluster werden aus Agent-3-Analysen aggregiert und nach Signalvolumen sortiert</div>
+    </div>
+    <div class="prob-grid">
+      {''.join(cards)}
+    </div>
+  </div>
+</section>
+"""
+    )
+
+
+def render_cluster_section(groups, analyzed_count):
+    cluster_cards = []
+    for cluster, items in sorted(groups.items(), key=lambda item: len(item[1]), reverse=True):
+        meta = CLUSTER_META.get(cluster, CLUSTER_META["Sonstiges"])
+        count = len(items)
+        urgency_counts = Counter(item["urgency"] for item in items)
+        label, _, stripe_class = urgency_label(urgency_counts, count)
+        badge_class = {
+            "Kritisch": "sig-crit",
+            "Hoch": "sig-high",
+            "Mittel": "sig-mid",
+            "Emerging": "sig-emg",
+        }.get(label, "sig-emg")
+        keywords = "".join(f'<span class="cl-src-tag">{kw}</span>' for kw in meta["keywords"])
+        cluster_cards.append(
+            f"""
+      <div class="cl-card">
+        <div class="cl-stripe {stripe_class}"></div>
+        <div class="cl-card-inner">
+          <div class="cl-top">
+            <div><div class="cl-name">{meta["display"]}</div><div class="cl-count">{count} Erw&auml;hnungen aus {analyzed_count} Analysen</div></div>
+            <span class="cl-signal-badge {badge_class}">{label}</span>
+          </div>
+          <div class="cl-sources-label">Zusammengesetzte Signale</div>
+          <div class="cl-sources">{keywords}</div>
+          <div class="cl-diagnosis">
+            <div class="cl-diag-label"><i class="ti ti-alert-circle"></i>Systemischer Befund</div>
+            <div class="cl-diag-text">{meta["diagnosis"]}</div>
+          </div>
+          <div class="cl-overlap"><i class="ti ti-git-branch"></i>{meta["overlap"]}</div>
+        </div>
+      </div>
+"""
+        )
+
+    if not cluster_cards:
+        cluster_cards.append(
+            """
+      <div class="cl-card">
+        <div class="cl-stripe stripe-emg"></div>
+        <div class="cl-card-inner">
+          <div class="cl-top"><div><div class="cl-name">No cluster data yet</div><div class="cl-count">0 analyzed records</div></div><span class="cl-signal-badge sig-emg">Pending</span></div>
+          <div class="cl-diagnosis"><div class="cl-diag-label">Systemischer Befund</div><div class="cl-diag-text">Run Agent 3 to turn cleaned posts into structured problem clusters.</div></div>
+        </div>
+      </div>
+"""
+        )
+
+    render_html(
+        f"""
+<section class="section" id="cluster">
+  <div class="cluster-panel">
+    <div class="sec-label">Dynamic Problem Clustering</div>
+    <h2 class="sec-title">Von Symptomen zu systemischen L&uuml;cken</h2>
+    <p class="sec-body">Einzelne Posts zeigen Symptome. Erst die Verdichtung nach Cluster, Dringlichkeit und Stakeholdern macht sichtbar, wo ein neuer Service ansetzen kann.</p>
+
+    <div class="cl-flow-row">
+      <div class="cl-flow-step"><div class="cl-flow-icon"><i class="ti ti-antenna-bars-3"></i></div><div class="cl-flow-label">Einzelsignale</div><div class="cl-flow-sub">Forum posts</div></div>
+      <div class="cl-flow-arrow">-&gt;</div>
+      <div class="cl-flow-step"><div class="cl-flow-icon"><i class="ti ti-circles-relation"></i></div><div class="cl-flow-label">Clustering</div><div class="cl-flow-sub">LLM JSON</div></div>
+      <div class="cl-flow-arrow">-&gt;</div>
+      <div class="cl-flow-step"><div class="cl-flow-icon"><i class="ti ti-alert-circle"></i></div><div class="cl-flow-label">Systemischer Riss</div><div class="cl-flow-sub">Patterns</div></div>
+      <div class="cl-flow-arrow">-&gt;</div>
+      <div class="cl-flow-step"><div class="cl-flow-icon"><i class="ti ti-bulb"></i></div><div class="cl-flow-label">Service Opportunity</div><div class="cl-flow-sub">Agent 4</div></div>
+    </div>
+
+    <div class="legend-row">
+      <span class="legend-label">Signalstatus:</span>
+      <span class="legend-item"><span class="cl-signal-badge sig-crit">Kritisch</span> hohe Eskalation</span>
+      <span class="legend-item"><span class="cl-signal-badge sig-high">Hoch</span> Intervention empfohlen</span>
+      <span class="legend-item"><span class="cl-signal-badge sig-mid">Mittel</span> sichtbar</span>
+      <span class="legend-item"><span class="cl-signal-badge sig-emg">Emerging</span> neu oder schwach</span>
+    </div>
+
+    <div class="cluster-grid">
+      {''.join(cluster_cards)}
+    </div>
+  </div>
+</section>
+"""
+    )
+
+
+def render_stakeholders(stakeholder_counts):
+    top_stakeholders = stakeholder_counts.most_common(6)
+    if not top_stakeholders:
+        top_stakeholders = [
+            ("Studierendenwerk", 0),
+            ("BAfG-Amt", 0),
+            ("Hochschule", 0),
+        ]
+
+    cards = []
+    for index, (name, count) in enumerate(top_stakeholders):
+        badge_class = stakeholder_badge_class(name)
+        active_class = " active" if index == 0 else ""
+        gap_class = "occ-open" if count and count < 4 else ""
+        occupancy = "Raum f&uuml;r neue Services" if gap_class else "Aktiv bearbeitet"
+        cards.append(
+            f"""
+      <div class="sh-ov-card{active_class}">
+        <div class="sh-ov-icon"><i class="ti ti-building-community"></i></div>
+        <div class="sh-ov-name">{esc(name)}</div>
+        <div class="sh-ov-role">{stakeholder_role(name)}</div>
+        <div class="sh-ov-badges"><span class="badge {badge_class}">{count} Signale</span></div>
+        <div class="sh-occ"><div class="occ-dot {gap_class}"></div><span>{occupancy}</span></div>
+      </div>
+"""
+        )
+
+    render_html(
+        f"""
+<section class="stakeholder-section" id="stakeholder">
+  <div class="sec-label">Stakeholder Dashboard</div>
+  <h2 class="sec-title">Wer macht was, und was bleibt offen?</h2>
+  <p class="sec-body">Die Karten zeigen, welche Akteure in den analysierten Posts am h&auml;ufigsten auftauchen. Hohe Erw&auml;hnung bedeutet nicht automatisch Verantwortung, aber einen klaren Workshop-Startpunkt.</p>
+  <div class="sh-overview-grid">
+    {''.join(cards)}
+  </div>
+  <div style="display:flex;gap:20px;flex-wrap:wrap;padding:12px 0 0;font-size:12px;color:var(--muted);border-top:0.5px solid var(--border);">
+    <span style="display:flex;align-items:center;gap:6px"><span style="width:8px;height:8px;border-radius:50%;background:var(--amb400);display:inline-block"></span>Bestehende Zust&auml;ndigkeit sichtbar</span>
+    <span style="display:flex;align-items:center;gap:6px"><span style="width:8px;height:8px;border-radius:50%;background:var(--grn400);display:inline-block"></span>Moegliche Service-Luecke</span>
+  </div>
+</section>
+"""
+    )
+
+
+def render_innovation(reports, groups):
+    latest = reports[0] if reports else None
+    if latest:
+        insight = parse_json(latest.get("report_json"))
+        metadata = insight.get("llm_metadata") if isinstance(insight.get("llm_metadata"), dict) else {}
+        innovations = insight.get("innovations") if isinstance(insight.get("innovations"), list) else []
+        if not innovations and insight.get("opportunity"):
+            innovations = [insight]
+        meta_items = []
+        if metadata.get("provider"):
+            meta_items.append(f"Provider: {esc(metadata.get('provider'))}")
+        if metadata.get("model"):
+            meta_items.append(f"Model: {esc(metadata.get('model'))}")
+        if metadata.get("source_count"):
+            meta_items.append(f"Sources: {esc(metadata.get('source_count'))}")
+        if metadata.get("prompt_strategy"):
+            meta_items.append(f"Prompt: {esc(metadata.get('prompt_strategy'))}")
+        meta_html = "".join(f"<span>{item}</span>" for item in meta_items)
+        summary = insight.get("portfolio_summary") or "Mehrere LLM-generierte Serviceideen aus den analysierten Bedarfssignalen."
+        cards = []
+        for index, innovation in enumerate(innovations[:6], start=1):
+            if not isinstance(innovation, dict):
+                continue
+
+            steps = innovation.get("implementation_steps") if isinstance(innovation.get("implementation_steps"), list) else []
+            steps_html = "".join(f"<li>{esc(step)}</li>" for step in steps[:5])
+            evidence_html = ""
+            if innovation.get("evidence"):
+                evidence_html = f"<p><strong>Evidence:</strong> {esc(innovation.get('evidence'))}</p>"
+            steps_section = ""
+            if steps_html:
+                steps_section = f"<p><strong>Implementation:</strong></p><ol class=\"ai-steps\">{steps_html}</ol>"
+            risk_html = ""
+            if innovation.get("risk"):
+                risk_html = f"<p><strong>Risk:</strong> {esc(innovation.get('risk'))}</p>"
+
+            cards.append(
+                f"""
+      <div class="innovation-card">
+        <div class="ai-kicker">Serviceidee {index}</div>
+        <div class="ai-name">{esc(innovation.get("opportunity", "Service Opportunity"))}</div>
+        <p><strong>Cluster:</strong> {esc(innovation.get("cluster", "N/A"))}</p>
+        <p><strong>Concept:</strong> {esc(innovation.get("solution", "N/A"))}</p>
+        <p><strong>Target group:</strong> {esc(innovation.get("target", "N/A"))}</p>
+        <p><strong>Stakeholder:</strong> {esc(innovation.get("stakeholder", "N/A"))}</p>
+        {evidence_html}
+        {steps_section}
+        {risk_html}
+      </div>
+"""
+            )
+
+        if not cards:
+            cards.append(
+                """
+      <div class="innovation-card">
+        <div class="ai-kicker">No valid innovation cards</div>
+        <div class="ai-name">Report format could not be rendered</div>
+        <p>The latest report exists, but it does not contain a usable innovation portfolio.</p>
+      </div>
+"""
+            )
+        evidence_html = ""
+        steps_section = ""
+        risk_html = ""
+        content = f"""
+    <div class="ai-result">
+      <div class="ai-kicker">Latest Agent 4 LLM Report · {esc(latest.get("created_at"))}</div>
+      <div class="ai-name">{esc(insight.get("opportunity", "Service Opportunity"))}</div>
+      <div class="ai-meta">{meta_html}</div>
+      <p><strong>Cluster:</strong> {esc(insight.get("cluster", "N/A"))}</p>
+      <p><strong>Concept:</strong> {esc(insight.get("solution", "N/A"))}</p>
+      <p><strong>Target group:</strong> {esc(insight.get("target", "N/A"))}</p>
+      <p><strong>Stakeholder:</strong> {esc(insight.get("stakeholder", "N/A"))}</p>
+      {evidence_html}
+      {steps_section}
+      {risk_html}
+    </div>
+"""
+        content = f"""
+    <div class="ai-summary">
+      <div class="ai-kicker">Latest Agent 4 LLM Portfolio &middot; {esc(latest.get("created_at"))}</div>
+      <div class="ai-meta">{meta_html}</div>
+      <p>{esc(summary)}</p>
+    </div>
+    <div class="innovation-grid">
+      {''.join(cards)}
+    </div>
+"""
+    else:
+        top_cluster = next(iter(sorted(groups.items(), key=lambda item: len(item[1]), reverse=True)), None)
+        hint = ""
+        if top_cluster:
+            meta = CLUSTER_META.get(top_cluster[0], CLUSTER_META["Sonstiges"])
+            hint = f'Top live cluster: <strong>{meta["display"]}</strong> with <strong>{len(top_cluster[1])}</strong> analyzed posts.'
+        content = f"""
+    <div class="empty-state">
+      <strong>No Agent 4 report found yet.</strong><br>
+      {hint} Run <code>python agent4_innovator.py</code> after Agent 3 has enough analyzed records to fill this section with a generated service concept.
+    </div>
+"""
+
+    render_html(
+        f"""
+<section class="ai-section" id="innovation">
+  <div class="sec-wrap">
+    <div class="sec-label">Service Innovation Output</div>
+    <h2 class="sec-title">Aus Signalen werden konkrete Serviceideen</h2>
+    <p class="sec-body">Der Innovationsbereich ist an das Agent-4-Output gekoppelt. Sobald ein Report in der Datenbank liegt, wird hier ein kuratiertes Portfolio mehrerer Serviceideen angezeigt.</p>
+    <div class="ai-box">
+      {content}
+    </div>
+  </div>
+</section>
+"""
+    )
+
+
+def render_status_lab(records, analyses, status_counts):
+    status_cards = []
+    for status, meta in STATUS_META.items():
+        status_cards.append(
+            f"""
+      <div class="status-card">
+        <div class="status-top"><span class="status-dot" style="background:{meta["accent"]}"></span><span class="status-num">{status_counts.get(status, 0)}</span></div>
+        <div class="status-label">{meta["label"]}</div>
+        <div class="status-copy">{meta["copy"]}</div>
+      </div>
+"""
+        )
+    render_html(
+        f"""
+<div class="data-lab">
+  <div class="sec-label">Operations Data Lab</div>
+  <h2 class="sec-title" style="font-size:30px">Pipeline-Zustand und Beispielsignale</h2>
+  <div class="status-grid">{"".join(status_cards)}</div>
+</div>
+"""
+    )
+
+    tab1, tab2, tab3 = st.tabs(["Latest analyzed signals", "Cleaned queue", "Raw intake"])
+
+    with tab1:
+        if not analyses:
+            st.info("No analyzed records yet.")
+        for item in analyses[:8]:
+            row = item["row"]
+            data = item["data"]
+            cluster = CLUSTER_META.get(item["cluster"], CLUSTER_META["Sonstiges"])["display"]
+            render_html(
+                f"""
+<div class="record-card">
+  <div class="record-meta">
+    <span class="record-pill">ID {esc(row.get("id"))}</span>
+    <span class="record-pill">{cluster}</span>
+    <span class="record-pill">{esc(item["urgency"])}</span>
+    <span class="record-pill">{esc(item["tone"])}</span>
+  </div>
+  <div class="record-title">{esc(one_line(row.get("cleaned_content"), 260))}</div>
+  <div class="record-json">{esc(json.dumps(data, ensure_ascii=False, indent=2))}</div>
+</div>
+"""
+            )
+
+    with tab2:
+        cleaned = [row for row in records if status_as_int(row.get("status")) == 1]
+        if not cleaned:
+            st.info("No cleaned records waiting for analysis.")
+        for row in cleaned[:8]:
+            render_html(
+                f"""
+<div class="record-card">
+  <div class="record-meta"><span class="record-pill">ID {esc(row.get("id"))}</span><span class="record-pill">status 1</span></div>
+  <div class="record-title">{esc(one_line(row.get("cleaned_content"), 320))}</div>
+</div>
+"""
+            )
+
+    with tab3:
+        raw = [row for row in records if status_as_int(row.get("status")) == 0]
+        if not raw:
+            st.info("No raw records in the intake queue.")
+        for row in raw[:8]:
+            render_html(
+                f"""
+<div class="record-card">
+  <div class="record-meta"><span class="record-pill">ID {esc(row.get("id"))}</span><span class="record-pill">status 0</span></div>
+  <div class="record-title">{esc(one_line(row.get("raw_content"), 320))}</div>
+</div>
+"""
+            )
+
+def render_footer():
+    render_html(
+        """
+<div class="ss-footer">
+  <div class="footer-brand">Service Sonar</div>
+  <div class="footer-txt">Social Intelligence Platform · SQLite · Streamlit · 2026</div>
+</div>
+"""
+    )
+
+
+def main():
+    render_html(CUSTOM_CSS)
+    records, reports = load_data()
+    status_counts = Counter(status_as_int(row.get("status")) for row in records)
+    analyses, groups, stakeholder_counts, urgency_counts, _ = build_analytics(records)
+    latest_report = reports[0] if reports else None
+    urgent_count = urgency_counts.get("Hoch", 0)
+
+    render_nav()
+    render_hero(
+        total_records=len(records),
+        analyzed_count=len(analyses),
+        cluster_count=len(groups),
+        urgent_count=urgent_count,
+    )
+    render_pipeline(status_counts)
+    render_problem_dashboard(groups, len(analyses))
+    render_cluster_section(groups, len(analyses))
+    render_stakeholders(stakeholder_counts)
+    render_innovation(reports, groups)
+    render_status_lab(records, analyses, status_counts)
+    render_footer()
+
+
+if __name__ == "__main__":
+    main()

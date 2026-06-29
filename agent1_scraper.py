@@ -17,6 +17,23 @@ class Agent1Scraper:
             "Studium & Psyche": "https://www.studis-online.de/Fragen-Brett/list.php?3"
         }
         self._initialisiere_datenbank()
+    
+    def _safe_get(self, url, timeout=20, retries=3):
+        """
+        Ruft eine Webseite robuster ab.
+        Wenn ein Request fehlschlägt, wird er mehrmals wiederholt.
+        """
+        for attempt in range(1, retries + 1):
+            try:
+                response = requests.get(url, headers=self.headers, timeout=timeout)
+                response.raise_for_status()
+                return response
+            except requests.exceptions.RequestException as e:
+                print(f"Request-Fehler Versuch {attempt}/{retries}: {url} -> {e}")
+                time.sleep(random.uniform(2.0, 4.0))
+
+        print(f"Seite nach {retries} Versuchen nicht erreichbar: {url}")
+        return None
 
     def _initialisiere_datenbank(self):
         """Initialisiert die Datenbank-Tabellen für die Rohdaten."""
@@ -51,8 +68,12 @@ class Agent1Scraper:
                 print(f"  📄 Lese Übersichtsseite {seite} -> {url}")
                 
                 try:
-                    antwort = requests.get(url, headers=self.headers, timeout=10)
-                    antwort.raise_for_status()
+                    antwort = self._safe_get(url, timeout=20, retries=3)
+
+                    if antwort is None:
+                        print(f"Übersichtsseite {seite} konnte nicht geladen werden. Überspringe Seite.")
+                        continue
+
                     soup = BeautifulSoup(antwort.text, 'html.parser')
                     links = soup.select('a.ston-farblinkh[href*="read.php"]')
                     
@@ -74,7 +95,12 @@ class Agent1Scraper:
                         
                         # DEEP SCRAPING: In den Post hineingehen
                         try:
-                            detail_resp = requests.get(post_url, headers=self.headers, timeout=10)
+                            detail_resp = self._safe_get(post_url, timeout=20, retries=2)
+
+                            if detail_resp is None:
+                                print(f"      Detailseite konnte nicht geladen werden. Überspringe Beitrag.")
+                                continue
+
                             detail_soup = BeautifulSoup(detail_resp.text, 'html.parser')
                             first_post_container = detail_soup.find('div', class_='ston-dblock')
                             
@@ -105,7 +131,7 @@ class Agent1Scraper:
                     
                 except Exception as e:
                     print(f"Netzwerkfehler auf Seite {seite}: {e}")
-                    break
+                    continue
                     
         conn.close()
         print(f"\n[Agent 1] Deep-Scraping beendet! {erfolgreich_gespeichert} Datensätze gespeichert.")
