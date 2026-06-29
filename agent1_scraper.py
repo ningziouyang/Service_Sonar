@@ -51,7 +51,7 @@ class Agent1Scraper:
                 print(f"  📄 Lese Übersichtsseite {seite} -> {url}")
                 
                 try:
-                    antwort = requests.get(url, headers=self.headers, timeout=(10, 60))
+                    antwort = requests.get(url, headers=self.headers, timeout=10)
                     antwort.raise_for_status()
                     soup = BeautifulSoup(antwort.text, 'html.parser')
                     links = soup.select('a.ston-farblinkh[href*="read.php"]')
@@ -74,7 +74,7 @@ class Agent1Scraper:
                         
                         # DEEP SCRAPING: In den Post hineingehen
                         try:
-                            detail_resp = requests.get(post_url, headers=self.headers, timeout=(10, 60))
+                            detail_resp = requests.get(post_url, headers=self.headers, timeout=10)
                             detail_soup = BeautifulSoup(detail_resp.text, 'html.parser')
                             first_post_container = detail_soup.find('div', class_='ston-dblock')
                             
@@ -165,7 +165,7 @@ def fetch_forum_data():
             
             try:
                 # HTTP-GET-Anfrage an die Übersichtsseite
-                response = requests.get(page_url, headers=HEADERS, timeout=(10, 60))
+                response = requests.get(page_url, headers=HEADERS, timeout=10)
                 response.raise_for_status()
                 soup = BeautifulSoup(response.text, 'html.parser')
                 
@@ -195,7 +195,7 @@ def fetch_forum_data():
                     # 🚀 DEEP SCRAPING: In den Post hineingehen
                     # =======================================================
                     try:
-                        detail_resp = requests.get(post_url, headers=HEADERS, timeout=(10, 60))
+                        detail_resp = requests.get(post_url, headers=HEADERS, timeout=10)
                         detail_soup = BeautifulSoup(detail_resp.text, 'html.parser')
                         
                         # ULTIMATIVER FIX: Scope eingrenzen! (Container-Lock)
