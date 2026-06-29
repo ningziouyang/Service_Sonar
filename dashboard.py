@@ -317,6 +317,213 @@ footer { display:none !important; }
 .occ-dot { width:6px; height:6px; border-radius:50%; background:var(--amb400); }
 .occ-open { background:var(--grn400); }
 
+/* STAKEHOLDER DETAILS */
+
+.sh-detail-panel {
+  background:white;
+  border:0.5px solid var(--border);
+  border-radius:var(--rxl);
+  padding:28px;
+}
+
+.sh-detail-head {
+  display:flex;
+  align-items:flex-start;
+  justify-content:space-between;
+  gap:18px;
+  margin-bottom:24px;
+}
+
+.sh-detail-identity {
+  display:flex;
+  align-items:center;
+  gap:14px;
+}
+
+.sh-detail-icon {
+  width:44px;
+  height:44px;
+  border-radius:14px;
+  background:var(--p50);
+  color:var(--p600);
+  display:grid;
+  place-items:center;
+  font-size:22px;
+  flex-shrink:0;
+}
+
+.sh-detail-name {
+  font-size:19px;
+  font-weight:500;
+  color:var(--text);
+  margin-bottom:3px;
+}
+
+.sh-detail-subtitle {
+  font-size:12px;
+  color:var(--muted);
+}
+
+.sh-detail-status {
+  display:flex;
+  align-items:center;
+  gap:6px;
+  font-size:12px;
+  color:var(--amb600);
+  margin-top:12px;
+}
+
+.sh-detail-status-dot {
+  width:7px;
+  height:7px;
+  border-radius:50%;
+  background:var(--amb400);
+}
+
+.sh-detail-grid {
+  display:grid;
+  grid-template-columns:1.15fr 1fr;
+  gap:30px;
+}
+
+.sh-detail-column + .sh-detail-column {
+  border-left:0.5px solid var(--border);
+  padding-left:30px;
+}
+
+.sh-detail-label {
+  font-size:10px;
+  font-weight:500;
+  text-transform:uppercase;
+  letter-spacing:.07em;
+  color:var(--light);
+  margin-bottom:14px;
+}
+
+.sh-problem-item {
+  padding:0 0 15px;
+  margin-bottom:15px;
+  border-bottom:0.5px solid var(--border);
+}
+
+.sh-problem-title {
+  display:flex;
+  align-items:center;
+  gap:8px;
+  color:var(--text);
+  font-size:13px;
+  font-weight:500;
+  margin-bottom:7px;
+}
+
+.sh-problem-dot {
+  width:7px;
+  height:7px;
+  border-radius:50%;
+  flex-shrink:0;
+}
+
+.sh-dot-red {
+  background:var(--red400);
+}
+
+.sh-dot-green {
+  background:var(--grn400);
+}
+
+.sh-problem-badge {
+  font-size:10px;
+  padding:2px 8px;
+  border-radius:20px;
+  font-weight:500;
+}
+
+.sh-badge-overloaded {
+  color:var(--red600);
+  background:var(--red50);
+}
+
+.sh-badge-open {
+  color:var(--grn600);
+  background:var(--grn50);
+}
+
+.sh-problem-copy {
+  font-size:12px;
+  color:var(--muted);
+  margin:0 0 5px 15px;
+  line-height:1.5;
+}
+
+.sh-problem-note {
+  font-size:11px;
+  color:var(--p600);
+  font-style:italic;
+  margin-left:15px;
+  line-height:1.45;
+}
+
+.sh-potential-card {
+  border-radius:var(--rmd);
+  padding:15px 16px;
+  margin-bottom:10px;
+  border:0.5px solid var(--border);
+}
+
+.sh-potential-red {
+  background:#fff7f7;
+  border-color:#f7d7d7;
+}
+
+.sh-potential-green {
+  background:var(--grn50);
+  border-color:#d5e7bc;
+}
+
+.sh-potential-neutral {
+  background:#fafafa;
+}
+
+.sh-potential-title {
+  font-size:10px;
+  font-weight:500;
+  text-transform:uppercase;
+  letter-spacing:.04em;
+  margin-bottom:7px;
+}
+
+.sh-potential-red .sh-potential-title {
+  color:var(--red600);
+}
+
+.sh-potential-green .sh-potential-title {
+  color:var(--grn600);
+}
+
+.sh-potential-neutral .sh-potential-title {
+  color:var(--muted);
+}
+
+.sh-potential-copy {
+  font-size:12px;
+  line-height:1.55;
+  color:var(--text);
+}
+
+@media(max-width:700px) {
+  .sh-detail-grid {
+    grid-template-columns:1fr;
+  }
+
+  .sh-detail-column + .sh-detail-column {
+    border-left:none;
+    border-top:0.5px solid var(--border);
+    padding-left:0;
+    padding-top:24px;
+  }
+}
+
+
 .ai-section { padding:0 0 76px; }
 .ai-box { background:var(--p50); border-radius:var(--rxl); padding:36px; border:0.5px solid var(--border); }
 .ai-result { background:white; border:0.5px solid #ddd; border-radius:var(--rlg); padding:24px; font-size:14px; line-height:1.7; color:#333; }
@@ -802,6 +1009,292 @@ def render_cluster_section(groups, analyzed_count):
 """
     )
 
+def render_stakeholder_detail(name: str, count: int) -> str:
+    """
+    Erstellt die Detailansicht für einen Stakeholder.
+
+    Aktuell werden stakeholder-spezifische Texte über einfache
+    Namensregeln ausgewählt. Später können diese Inhalte aus
+    Agent-3- oder Agent-4-Daten erzeugt werden.
+    """
+
+    lowered = name.lower()
+
+    if "hochschule" in lowered or "universit" in lowered:
+        subtitle = "Strukturelle Früherkennung & Maßnahmen"
+
+        problems = [
+            {
+                "title": "Psychische Belastung",
+                "status": "überlastet",
+                "dot_class": "sh-dot-red",
+                "badge_class": "sh-badge-overloaded",
+                "solution": "Psychologische Beratungsstelle ausgebaut",
+                "note": (
+                    "Direkter Zugang zu Studierenden – aber stark "
+                    "überlastet, Wartezeiten bis 6 Wochen"
+                ),
+            },
+            {
+                "title": "Soziale Isolation",
+                "status": "offen",
+                "dot_class": "sh-dot-green",
+                "badge_class": "sh-badge-open",
+                "solution": "Onboarding-Programme für Erstsemester",
+                "note": (
+                    "Struktureller Zugang zu allen Erstsemestern – "
+                    "aber Programm endet nach Woche 1"
+                ),
+            },
+        ]
+
+        potentials = [
+            {
+                "style": "sh-potential-red",
+                "title": "Optimierungspotenzial · Psychische Belastung",
+                "copy": (
+                    "KI-gestütztes Ersttriage-Tool könnte Wartezeiten "
+                    "reduzieren: schnelle Einschätzung, ob Sofortberatung "
+                    "oder Gruppenangebot passender ist."
+                ),
+            },
+            {
+                "style": "sh-potential-green",
+                "title": "Schließungspotenzial · Soziale Isolation",
+                "copy": (
+                    "Kontinuierliches Peer-Netzwerk nach der Einführungswoche "
+                    "fehlt – strukturierte Begleitung über das erste Semester "
+                    "wäre möglich."
+                ),
+            },
+            {
+                "style": "sh-potential-neutral",
+                "title": "Neuer Service möglich",
+                "copy": (
+                    "Behörden-Überforderung ist noch nicht ausreichend "
+                    "abgedeckt – eine strukturierte Orientierungshilfe für "
+                    "Formulare und Fristen wäre denkbar."
+                ),
+            },
+        ]
+
+    elif "studierendenwerk" in lowered or "studentenwerk" in lowered:
+        subtitle = "Soziale, finanzielle und wohnbezogene Unterstützung"
+
+        problems = [
+            {
+                "title": "Finanzielle Belastung",
+                "status": "überlastet",
+                "dot_class": "sh-dot-red",
+                "badge_class": "sh-badge-overloaded",
+                "solution": "Sozialberatung und BAföG-Unterstützung vorhanden",
+                "note": (
+                    "Viele parallele Anfragen und schwer verständliche "
+                    "administrative Abläufe"
+                ),
+            },
+            {
+                "title": "Wohnungsstress",
+                "status": "offen",
+                "dot_class": "sh-dot-green",
+                "badge_class": "sh-badge-open",
+                "solution": "Wohnheime und allgemeine Wohnberatung",
+                "note": (
+                    "Angebote bestehen, decken kurzfristige Engpässe "
+                    "jedoch nicht vollständig ab"
+                ),
+            },
+        ]
+
+        potentials = [
+            {
+                "style": "sh-potential-red",
+                "title": "Optimierungspotenzial · Beratung",
+                "copy": (
+                    "Ein digitales Vorprüfungs- und Routing-System könnte "
+                    "Anfragen nach Dringlichkeit und Zuständigkeit sortieren."
+                ),
+            },
+            {
+                "style": "sh-potential-green",
+                "title": "Schließungspotenzial · Wohnen",
+                "copy": (
+                    "Eine verifizierte kurzfristige Wohnbörse könnte Studierende "
+                    "bei akuten Wohnungsproblemen gezielter unterstützen."
+                ),
+            },
+            {
+                "style": "sh-potential-neutral",
+                "title": "Neuer Service möglich",
+                "copy": (
+                    "Ein zentraler Härtefall-Navigator könnte finanzielle, "
+                    "soziale und wohnbezogene Hilfen verbinden."
+                ),
+            },
+        ]
+
+    elif "baf" in lowered or "finanz" in lowered:
+        subtitle = "Studienfinanzierung & administrative Zugänge"
+
+        problems = [
+            {
+                "title": "Komplexe Anträge",
+                "status": "überlastet",
+                "dot_class": "sh-dot-red",
+                "badge_class": "sh-badge-overloaded",
+                "solution": "Persönliche Beratung und digitale Formulare",
+                "note": (
+                    "Rückfragen, Nachweise und unklare Bearbeitungsstände "
+                    "verursachen zusätzliche Belastung"
+                ),
+            },
+            {
+                "title": "Informationslücken",
+                "status": "offen",
+                "dot_class": "sh-dot-green",
+                "badge_class": "sh-badge-open",
+                "solution": "Allgemeine Informationsseiten vorhanden",
+                "note": (
+                    "Individuelle Sonderfälle werden durch statische "
+                    "Informationen nur teilweise abgedeckt"
+                ),
+            },
+        ]
+
+        potentials = [
+            {
+                "style": "sh-potential-red",
+                "title": "Optimierungspotenzial · Antrag",
+                "copy": (
+                    "Ein interaktiver Dokumentencheck könnte fehlende Nachweise "
+                    "vor der Abgabe erkennen."
+                ),
+            },
+            {
+                "style": "sh-potential-green",
+                "title": "Schließungspotenzial · Transparenz",
+                "copy": (
+                    "Ein verständlicher Status-Tracker könnte Bearbeitungsphasen "
+                    "und nächste notwendige Schritte erklären."
+                ),
+            },
+            {
+                "style": "sh-potential-neutral",
+                "title": "Neuer Service möglich",
+                "copy": (
+                    "Eine persönliche Finanzierungsübersicht könnte BAföG, "
+                    "Stipendien und Härtefallhilfen gemeinsam darstellen."
+                ),
+            },
+        ]
+
+    else:
+        subtitle = stakeholder_role(name)
+
+        problems = [
+            {
+                "title": "Wiederkehrende Bedarfssignale",
+                "status": "offen",
+                "dot_class": "sh-dot-green",
+                "badge_class": "sh-badge-open",
+                "solution": f"{count} Signale wurden diesem Stakeholder zugeordnet",
+                "note": (
+                    "Die genaue bestehende Zuständigkeit sollte in einem "
+                    "Service-Design-Workshop geprüft werden."
+                ),
+            },
+        ]
+
+        potentials = [
+            {
+                "style": "sh-potential-neutral",
+                "title": "Analysepotenzial",
+                "copy": (
+                    "Die vorhandenen Signale können genutzt werden, um "
+                    "Zuständigkeiten, Überlastung und mögliche neue Services "
+                    "systematisch zu prüfen."
+                ),
+            },
+        ]
+
+    problems_html = "".join(
+        f"""
+        <div class="sh-problem-item">
+          <div class="sh-problem-title">
+            <span class="sh-problem-dot {problem['dot_class']}"></span>
+            <span>{esc(problem['title'])}</span>
+            <span class="sh-problem-badge {problem['badge_class']}">
+              {esc(problem['status'])}
+            </span>
+          </div>
+
+          <div class="sh-problem-copy">
+            {esc(problem['solution'])}
+          </div>
+
+          <div class="sh-problem-note">
+            {esc(problem['note'])}
+          </div>
+        </div>
+        """
+        for problem in problems
+    )
+
+    potentials_html = "".join(
+        f"""
+        <div class="sh-potential-card {potential['style']}">
+          <div class="sh-potential-title">
+            {esc(potential['title'])}
+          </div>
+
+          <div class="sh-potential-copy">
+            {esc(potential['copy'])}
+          </div>
+        </div>
+        """
+        for potential in potentials
+    )
+
+    return f"""
+<div class="sh-detail-head">
+  <div>
+    <div class="sh-detail-identity">
+      <div class="sh-detail-icon">
+        <i class="ti ti-building-community"></i>
+      </div>
+
+      <div>
+        <div class="sh-detail-name">{esc(name)}</div>
+        <div class="sh-detail-subtitle">{esc(subtitle)}</div>
+      </div>
+    </div>
+
+    <div class="sh-detail-status">
+      <span class="sh-detail-status-dot"></span>
+      Wird aktiv bearbeitet · {count} erkannte Signale
+    </div>
+  </div>
+</div>
+
+<div class="sh-detail-grid">
+  <div class="sh-detail-column">
+    <div class="sh-detail-label">
+      Bearbeitete Probleme & Lösungen
+    </div>
+
+    {problems_html}
+  </div>
+
+  <div class="sh-detail-column">
+    <div class="sh-detail-label">
+      Innovationspotenzial
+    </div>
+
+    {potentials_html}
+  </div>
+</div>
+"""
+
 
 def render_stakeholders(stakeholder_counts):
     top_stakeholders = stakeholder_counts.most_common(6)
@@ -811,6 +1304,13 @@ def render_stakeholders(stakeholder_counts):
             ("BAfG-Amt", 0),
             ("Hochschule", 0),
         ]
+
+    selected_name, selected_count = top_stakeholders[0]
+
+    detail_html = render_stakeholder_detail(
+         selected_name,
+         selected_count,
+    )
 
     cards = []
     for index, (name, count) in enumerate(top_stakeholders):
@@ -839,9 +1339,52 @@ def render_stakeholders(stakeholder_counts):
   <div class="sh-overview-grid">
     {''.join(cards)}
   </div>
-  <div style="display:flex;gap:20px;flex-wrap:wrap;padding:12px 0 0;font-size:12px;color:var(--muted);border-top:0.5px solid var(--border);">
-    <span style="display:flex;align-items:center;gap:6px"><span style="width:8px;height:8px;border-radius:50%;background:var(--amb400);display:inline-block"></span>Bestehende Zust&auml;ndigkeit sichtbar</span>
-    <span style="display:flex;align-items:center;gap:6px"><span style="width:8px;height:8px;border-radius:50%;background:var(--grn400);display:inline-block"></span>Moegliche Service-Luecke</span>
+  <div style="
+    display:flex;
+    gap:20px;
+    flex-wrap:wrap;
+    padding:12px 0 24px;
+    font-size:12px;
+    color:var(--muted);
+    border-bottom:0.5px solid var(--border);
+    margin-bottom:24px;
+  ">
+    <span style="display:flex;align-items:center;gap:6px">
+      <span style="
+        width:8px;
+        height:8px;
+        border-radius:50%;
+        background:var(--amb400);
+        display:inline-block;
+      "></span>
+      Aktiv bearbeitet &mdash; bestehende Zust&auml;ndigkeit
+    </span>
+
+    <span style="display:flex;align-items:center;gap:6px">
+      <span style="
+        width:8px;
+        height:8px;
+        border-radius:50%;
+        background:var(--grn400);
+        display:inline-block;
+      "></span>
+      Raum f&uuml;r neue Services &mdash; strukturelle L&uuml;cke erkannt
+    </span>
+
+    <span style="display:flex;align-items:center;gap:6px">
+      <span style="
+        width:8px;
+        height:8px;
+        border-radius:50%;
+        background:var(--red400);
+        display:inline-block;
+      "></span>
+      &Uuml;berlastet &mdash; optimierbar durch neuen Service
+    </span>
+  </div>
+
+  <div class="sh-detail-panel" id="sh-detail">
+    {detail_html}
   </div>
 </section>
 """
