@@ -1,5 +1,6 @@
 import html
 import json
+import os
 import sqlite3
 from collections import Counter, defaultdict
 from pathlib import Path
@@ -17,6 +18,48 @@ st.set_page_config(
 )
 
 DB_FILE = Path(__file__).with_name("service_sonar.db")
+
+
+def sync_streamlit_secrets_to_env():
+    """Expose Streamlit Cloud secrets as env vars for the agent modules."""
+    secret_keys = (
+        "GROQ_API_KEY",
+        "GROQ_BASE_URL",
+        "GROQ_MODEL",
+        "OPENAI_API_KEY",
+        "OPENAI_BASE_URL",
+        "OPENAI_MODEL",
+        "OPENROUTER_API_KEY",
+        "OPENROUTER_BASE_URL",
+        "OPENROUTER_MODEL",
+        "DEEPSEEK_API_KEY",
+        "DEEPSEEK_BASE_URL",
+        "DEEPSEEK_MODEL",
+        "OLLAMA_ENABLED",
+        "OLLAMA_API_KEY",
+        "OLLAMA_BASE_URL",
+        "OLLAMA_MODEL",
+        "AGENT4_PROVIDER_ORDER",
+        "AGENT4_MAX_RETRIES",
+        "AGENT4_RETRY_BASE_SECONDS",
+        "AGENT4_MAX_RETRY_SLEEP",
+        "AGENT4_TEMPERATURE",
+    )
+
+    for key in secret_keys:
+        if os.getenv(key):
+            continue
+
+        try:
+            value = st.secrets.get(key)
+        except Exception:
+            value = None
+
+        if value:
+            os.environ[key] = str(value)
+
+
+sync_streamlit_secrets_to_env()
 
 
 STATUS_META = {
