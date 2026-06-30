@@ -50,43 +50,7 @@ def init_db():
     conn.close()
 
 # =====================================================================
-# ---- 1. INTERVENTIONS-INTERFACE: HUMAN-OVERRIDE ----
-# =====================================================================
-
-def human_intervention_interface():
-    """
-    Schnittstelle für den Human-in-the-Loop.
-    Ermöglicht es dem menschlichen Forscher, sensible Härtefälle (status=3) 
-    manuell zu prüfen, zu anonymisieren und für die KI freizugeben.
-    """
-    print("\n---------------------------------------------------------------------")
-    print("[HITL Interface] Starte manuelle Überprüfung für blockierte Fälle (status=3)...")
-    print("---------------------------------------------------------------------")
-    
-    conn = sqlite3.connect(DB_FILE)
-    cursor = conn.cursor()
-    cursor.execute("SELECT id, raw_content FROM forum_posts WHERE status = 3")
-    blocked_records = cursor.fetchall()
-
-    if not blocked_records:
-        print("[HITL Interface] Keine Fälle in der Warteschlange für Human Review.")
-    else:
-        for db_id, raw_text in blocked_records:
-            print(f"\n[MANUELLE PRÜFUNG] Fall-ID: {db_id}")
-            print(f"Sensibler Text: '{raw_text}'")
-            
-            # Simulation einer menschlichen Aktion (Anonymisierung & Freigabe)
-            user_input_simulation = "[MANUELL BEREINIGT] Bestätigter Fall von akuter Belastung. Freigegeben für Agent 3."
-            print(f"[Forscher-Aktion] Fall geprüft, bereinigt und freigegeben (status=1).")
-            
-            # Update der Datenbank: Setzt den Status auf 1, damit Agent 3 übernehmen kann
-            cursor.execute("UPDATE forum_posts SET cleaned_content = ?, status = 1 WHERE id = ?", (user_input_simulation, db_id))
-    
-    conn.commit()
-    conn.close()
-
-# =====================================================================
-# ---- 2. ZENTRALE ORCHESTRIERUNG: SUPERVISOR AGENT ----
+# ---- 1. ZENTRALE ORCHESTRIERUNG: SUPERVISOR AGENT ----
 # =====================================================================
 
 def supervisor_agent():
@@ -111,9 +75,6 @@ def supervisor_agent():
     cleaner = Agent2Cleaner()
     cleaner.run()
     
-    # INTERVENTION: Menschliche Überprüfung der blockierten Fälle
-    human_intervention_interface()
-    
     # PHASE 3: Semantische Analyse (Verarbeitet status=1 -> 2)
     print("\n>>> STARTE PHASE 3: SEMANTISCHE ANALYSE (LLM) <<<")
     analyzer = Agent3Analyzer()
@@ -125,8 +86,40 @@ def supervisor_agent():
     innovator.run()
     
     print("\n=====================================================================")
-    print("--- [Supervisor] Alle Agenten-Phasen inklusive HITL erfolgreich durchlaufen. ---")
+    print("--- [Supervisor] Automatische Agenten-Phasen abgeschlossen. ---")
+    print("Hinweis: Fälle mit status=3 bleiben in der Human-Review-Queue.")
+
+def run_after_review():
+    """
+    Wird nach manueller Prüfung ausgeführt.
+    Neu freigegebene Beiträge mit status=1 werden von Agent 3 verarbeitet.
+    """
+
+    print("\n=====================================================================")
+    print("--- [Supervisor] Starte Pipeline nach Human Review ---")
+    print("=====================================================================")
+
+    print("\n>>> PHASE 3: SEMANTISCHE ANALYSE <<<")
+    analyzer = Agent3Analyzer()
+    analyzer.run()
+
+    print("\n>>> PHASE 4: INNOVATIONS-GENERIERUNG <<<")
+    innovator = Agent4Innovator()
+    innovator.run()
+
+    print("\n=====================================================================")
+    print("--- [Supervisor] Nachverarbeitung abgeschlossen. ---")
     print("=====================================================================\n")
 
 if __name__ == "__main__":
-    supervisor_agent()
+    mode = input(
+        "1 = Full Pipeline\n"
+        "2 = After Human Review\n"
+        "Auswahl: "
+    )
+
+    if mode == "1":
+        supervisor_agent()
+
+    elif mode == "2":
+        run_after_review()
