@@ -333,8 +333,12 @@ The JSON must contain these top-level fields:
       "solution": "2-4 Sätze zur Servicearchitektur und zum konkreten Konzept",
       "target": "Primäre Zielgruppe",
       "stakeholder": "Zuständige oder beteiligte Akteure",
-      "evidence": "1-2 Sätze, welche aggregierten Signale die Idee begründen",
-      "implementation_steps": ["Schritt 1", "Schritt 2", "Schritt 3"],
+      "evidence": "1-2 konkrete Sätze ausschließlich zur Problemlage: Welche wiederkehrenden Bedarfe, Beschwerden, Cluster oder Stakeholder-Konflikte begründen die Idee? Die vorgeschlagene Lösung oder ihre Vorteile dürfen hier nicht erwähnt werden.",
+      "implementation_steps": [
+        "Pilot: konkreter erster Test mit benanntem Verantwortlichen und klarer Zielgruppe",
+        "Integration: konkrete Einbindung in einen bestehenden Prozess oder Kanal",
+        "Evaluation: messbares Erfolgskriterium und Entscheidung über Skalierung"
+      ],
       "risk": "Zentrales Umsetzungsrisiko oder ethische Grenze"
     }
   ]
@@ -351,6 +355,9 @@ The innovation portfolio must:
 4. be more specific than an awareness campaign or generic counselling offer,
 5. explain why the data supports this idea,
 6. avoid inventing raw data, statistics, laws, or institutional procedures.
+7. In "evidence", explain the underlying recurring need or service gap, not the proposed solution itself.
+8. Make every implementation step operational: name an actor, an action, and an observable output or decision. Avoid generic steps such as "Tool entwickeln", "integrieren" or "Mitarbeitende schulen" without further specification.
+9. Structure implementation_steps as Pilot, Integration and Evaluation whenever possible.
 
 Diversity constraints:
 - Generate at least 3 innovations if at least 3 problem clusters exist.

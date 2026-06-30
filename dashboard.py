@@ -4,6 +4,7 @@ import sqlite3
 from collections import Counter, defaultdict
 from pathlib import Path
 from textwrap import dedent
+import re
 
 import streamlit as st
 
@@ -623,6 +624,127 @@ div[class*="st-key-stakeholder_card_wrap_"] .sh-ov-card *{
   }
 }
 
+/* --- Service Gap Actions --- */
+
+.st-key-service_gap_actions {
+  margin-top:16px;
+}
+
+.st-key-service_gap_actions > div[data-testid="stVerticalBlock"] {
+  gap:10px!important;
+}
+
+.st-key-service_gap_actions div[data-testid="stButton"] button {
+  min-height:44px!important;
+  border-radius:14px!important;
+  border:1px solid #d5e7bc!important;
+  background:var(--grn50)!important;
+  color:var(--grn600)!important;
+  font-size:12px!important;
+  font-weight:500!important;
+  padding:0 16px!important;
+}
+
+.st-key-service_gap_actions div[data-testid="stButton"] button:hover {
+  border-color:var(--grn400)!important;
+  background:#e2f0cf!important;
+  color:var(--grn600)!important;
+}
+
+.service-modal-card {
+  padding:4px 2px 8px;
+}
+
+.service-modal-kicker {
+  font-size:11px;
+  font-weight:500;
+  text-transform:uppercase;
+  letter-spacing:.07em;
+  color:var(--p600);
+  margin-bottom:10px;
+}
+
+.service-modal-title {
+  font-family:'DM Serif Display', Georgia, serif;
+  font-size:34px;
+  line-height:1.14;
+  color:var(--text);
+  margin-bottom:14px;
+}
+
+.service-modal-meta {
+  display:flex;
+  flex-wrap:wrap;
+  gap:7px;
+  margin-bottom:22px;
+}
+
+.service-modal-meta span {
+  font-size:11px;
+  color:var(--p600);
+  background:var(--p50);
+  border-radius:20px;
+  padding:5px 11px;
+}
+
+.service-modal-section {
+  margin-bottom:18px;
+}
+
+.service-modal-label {
+  font-size:10px;
+  font-weight:500;
+  text-transform:uppercase;
+  letter-spacing:.07em;
+  color:var(--light);
+  margin-bottom:8px;
+}
+
+.service-modal-copy {
+  font-size:13px;
+  line-height:1.7;
+  color:var(--muted);
+}
+
+.service-modal-grid {
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:16px;
+  margin-bottom:16px;
+}
+
+.service-modal-box {
+  background:#faf9ff;
+  border:0.5px solid var(--border);
+  border-radius:14px;
+  padding:16px;
+}
+
+.service-modal-steps {
+  margin:0;
+  padding-left:18px;
+  color:var(--muted);
+  font-size:12px;
+  line-height:1.7;
+}
+
+.service-modal-risk {
+  background:#fff7f7;
+  border:0.5px solid #f7d7d7;
+  border-radius:14px;
+  padding:16px;
+}
+
+.service-modal-risk .service-modal-label {
+  color:var(--red600);
+}
+
+@media(max-width:700px) {
+  .service-modal-grid {
+    grid-template-columns:1fr;
+  }
+}
+
 /* SERVICE GENERATION OUTPUT */
 .ai-section{padding:76px 0 28px;}
 .ai-inner{max-width:var(--max);margin:0 auto;}
@@ -835,6 +957,211 @@ def normalize_stakeholder_name(name: str) -> str:
 
 def select_stakeholder(name: str) -> None:
     st.session_state.selected_stakeholder = name
+
+def _service_idea_tokens(*values) -> set[str]:
+    text = " ".join(str(value or "") for value in values).lower()
+
+    return {
+        token
+        for token in re.findall(
+            r"[a-zA-ZäöüÄÖÜß0-9]+",
+            text,
+        )
+        if len(token) >= 4
+    }
+
+
+def _match_service_innovation(
+    service_gap: dict,
+    stakeholder_name: str,
+    innovations: list,
+) -> dict | None:
+    gap_tokens = _service_idea_tokens(
+        service_gap.get("title"),
+        service_gap.get("evidence"),
+        service_gap.get("recommendation"),
+        stakeholder_name,
+    )
+
+    best_match = None
+    best_score = -1
+
+    for innovation in innovations:
+        if not isinstance(innovation, dict):
+            continue
+
+        innovation_tokens = _service_idea_tokens(
+            innovation.get("cluster"),
+            innovation.get("opportunity"),
+            innovation.get("solution"),
+            innovation.get("target"),
+            innovation.get("stakeholder"),
+            innovation.get("evidence"),
+        )
+
+        score = len(gap_tokens & innovation_tokens)
+
+        if score > best_score:
+            best_score = score
+            best_match = innovation
+
+    return best_match
+
+
+@st.dialog("Service Innovation", width="large")
+def show_service_innovation_dialog(
+    service_gap: dict,
+    stakeholder_name: str,
+    innovation: dict | None,
+) -> None:
+    title = str(
+        service_gap.get("title")
+        or "Neue Serviceidee"
+    )
+
+    recommendation = str(
+        service_gap.get("recommendation")
+        or ""
+    )
+
+    evidence = str(
+        service_gap.get("evidence")
+        or ""
+    )
+
+    if innovation:
+        opportunity = (
+            innovation.get("opportunity")
+            or title
+        )
+
+        cluster = (
+            innovation.get("cluster")
+            or title
+        )
+
+        solution = (
+            innovation.get("solution")
+            or recommendation
+        )
+
+        target = (
+            innovation.get("target")
+            or "Studierende"
+        )
+
+        stakeholder = (
+            innovation.get("stakeholder")
+            or stakeholder_name
+        )
+
+        innovation_evidence = (
+            innovation.get("evidence")
+            or evidence
+        )
+
+        risk = (
+            innovation.get("risk")
+            or "Keine Risikobeschreibung verfügbar."
+        )
+
+        implementation_steps = innovation.get(
+            "implementation_steps",
+            [],
+        )
+
+    else:
+        opportunity = title
+        cluster = title
+        solution = recommendation
+        target = "Studierende"
+        stakeholder = stakeholder_name
+        innovation_evidence = evidence
+
+        risk = (
+            "Im aktuellen Agent-4-Report ist noch keine "
+            "Risikobeschreibung vorhanden."
+        )
+
+        implementation_steps = []
+
+    if not isinstance(implementation_steps, list):
+        implementation_steps = [
+            str(implementation_steps)
+        ]
+
+    steps_html = "".join(
+        f"<li>{esc(step)}</li>"
+        for step in implementation_steps
+        if str(step).strip()
+    )
+
+    if not steps_html:
+        steps_html = (
+            "<li>Noch keine Umsetzungsschritte verfügbar.</li>"
+        )
+
+    render_html(
+        f"""
+<div class="service-modal-card">
+  <div class="service-modal-kicker">
+    Agent-4 Service Innovation
+  </div>
+
+  <div class="service-modal-title">
+    {esc(opportunity)}
+  </div>
+
+  <div class="service-modal-meta">
+    <span>Cluster: {esc(cluster)}</span>
+    <span>Zielgruppe: {esc(target)}</span>
+    <span>Stakeholder: {esc(stakeholder)}</span>
+  </div>
+
+  <div class="service-modal-section">
+    <div class="service-modal-label">
+      Konzept
+    </div>
+
+    <div class="service-modal-copy">
+      {esc(solution)}
+    </div>
+  </div>
+
+  <div class="service-modal-grid">
+    <div class="service-modal-box">
+      <div class="service-modal-label">
+        Datengrundlage
+      </div>
+
+      <div class="service-modal-copy">
+        {esc(innovation_evidence)}
+      </div>
+    </div>
+
+    <div class="service-modal-box">
+      <div class="service-modal-label">
+        Umsetzungsschritte
+      </div>
+
+      <ol class="service-modal-steps">
+        {steps_html}
+      </ol>
+    </div>
+  </div>
+
+  <div class="service-modal-risk">
+    <div class="service-modal-label">
+      Risiko / ethische Grenze
+    </div>
+
+    <div class="service-modal-copy">
+      {esc(risk)}
+    </div>
+  </div>
+</div>
+"""
+    )
 
 @st.cache_data(ttl=20, show_spinner=False)
 def load_data():
@@ -1561,6 +1888,10 @@ def render_stakeholders(stakeholder_counts, reports):
             f"{latest_report_row.get('created_at', '')}"
         )
 
+    innovations = latest_report.get("innovations", [])
+    if not isinstance(innovations, list):
+        innovations = []
+
     if st.session_state.get("stakeholder_report_cache_key") != report_cache_key:
         profiles = latest_report.get("stakeholder_profiles", [])
         profile_cache = {}
@@ -1768,6 +2099,58 @@ def render_stakeholders(stakeholder_counts, reports):
 </div>
 """
         )
+
+        selected_profile = get_profile(selected_name)
+        selected_task_areas = selected_profile.get("task_areas", [])
+
+        if not isinstance(selected_task_areas, list):
+            selected_task_areas = []
+
+        service_gaps = [
+            area
+            for area in selected_task_areas
+            if isinstance(area, dict)
+            and str(area.get("status", "")).strip().lower() == "service_gap"
+        ]
+
+        if service_gaps:
+            with st.container(key="service_gap_actions"):
+                render_html(
+                    '<div class="sh-detail-label" style="margin-top:18px;">'
+                    'Mögliche Service Innovation'
+                    '</div>'
+                )
+
+                gap_columns = st.columns(min(3, len(service_gaps)))
+
+                for index, service_gap in enumerate(service_gaps):
+                    gap_title = str(
+                        service_gap.get("title")
+                        or f"Serviceidee {index + 1}"
+                    )
+
+                    matched_innovation = _match_service_innovation(
+                        service_gap,
+                        selected_name,
+                        innovations,
+                    )
+
+                    with gap_columns[index % len(gap_columns)]:
+                        if st.button(
+                            f"↗ {gap_title}",
+                            key=(
+                                "open_service_gap_"
+                                f"{normalize_stakeholder_name(selected_name)}_"
+                                f"{index}"
+                            ),
+                            use_container_width=True,
+                        ):
+                            show_service_innovation_dialog(
+                                service_gap,
+                                selected_name,
+                                matched_innovation,
+                            )
+
 
 def render_innovation_new(reports, groups):
     if "signal_input" not in st.session_state:
