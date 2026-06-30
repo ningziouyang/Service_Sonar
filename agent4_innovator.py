@@ -2,6 +2,7 @@ import argparse
 import hashlib
 import json
 import os
+import re
 import sqlite3
 import time
 from collections import Counter, defaultdict
@@ -160,11 +161,23 @@ class Agent4Innovator:
             return clean
         return clean[: limit - 1].rstrip() + "..."
 
+    def _limit_description(self, text, max_sentences=2, max_chars=180):
+        clean = " ".join(str(text or "").split())
+        sentences = re.split(r"(?<=[.!?])\s+", clean)
+        shortened = " ".join(sentences[:max_sentences]).strip()
+
+        if len(shortened) <= max_chars:
+            return shortened
+
+        return shortened[: max_chars - 1].rstrip() + "…"
+
     def _build_evidence_bundle(self, records, source_signature):
         clusters = Counter()
         urgencies = Counter()
         tones = Counter()
         stakeholders = Counter()
+        stakeholder_clusters = defaultdict(Counter)
+        stakeholder_examples = defaultdict(list)
         cluster_urgencies = defaultdict(Counter)
         representative_pool = []
 
@@ -181,7 +194,20 @@ class Agent4Innovator:
             urgencies[urgency] += 1
             tones[tone] += 1
             cluster_urgencies[cluster][urgency] += 1
-            stakeholders.update(str(item) for item in stakeholder_list if item)
+
+            clean_stakeholders = [
+                str(item).strip()
+                for item in stakeholder_list
+                if str(item).strip()
+            ]
+            stakeholders.update(clean_stakeholders)
+
+            for stakeholder in clean_stakeholders:
+                stakeholder_clusters[stakeholder][cluster] += 1
+                if len(stakeholder_examples[stakeholder]) < 2:
+                    stakeholder_examples[stakeholder].append(
+                        self._shorten(cleaned_text, 220)
+                    )
 
             priority = 0
             if urgency == "Hoch":
@@ -249,8 +275,16 @@ class Agent4Innovator:
             "urgency_distribution": dict(urgencies.most_common()),
             "emotional_tone_distribution": dict(tones.most_common()),
             "top_stakeholders": [
-                {"name": name, "mentions": count}
-                for name, count in stakeholders.most_common(12)
+                {
+                    "name": name,
+                    "mentions": count,
+                    "top_clusters": [
+                        cluster_name
+                        for cluster_name, _ in stakeholder_clusters[name].most_common(3)
+                    ],
+                    "examples": stakeholder_examples[name],
+                }
+                for name, count in stakeholders.most_common(6)
             ],
             "representative_cases": representative_cases,
         }
@@ -263,7 +297,7 @@ Your task is not to summarize complaints. Your task is to generate a portfolio
 of 3-5 concrete, implementable service innovations based on the empirical weak
 signals produced by Agent 3.
 
-Use only the provided aggregated evidence:
+Use only the provided aggregated evidence. Create exactly one stakeholder profile for every name in top_stakeholders. Do not skip any name and do not add new names:
 - problem clusters
 - urgency distribution
 - emotional tone distribution
@@ -278,6 +312,12 @@ Hochschulberatung, International Office, Prüfungsamt, Sozialberatung.
 The JSON must contain these top-level fields:
 {
   "portfolio_summary": "2-3 Sätze, welche Service-Lücken das Portfolio insgesamt adressiert",
+  "stakeholder_profiles": [
+    {
+      "name": "Exakter Name aus top_stakeholders",
+      "description": "Maximal 2 kurze datenbasierte Sätze und höchstens 180 Zeichen: Rolle im Problemfeld und häufige zugeordnete Themen"
+    }
+  ],
   "innovations": [
     {
       "cluster": "Zentrales systemisches Problemcluster",
@@ -292,6 +332,7 @@ The JSON must contain these top-level fields:
   ]
 }
 
+The number of stakeholder_profiles must exactly match the number of entries in top_stakeholders.
 The innovation portfolio must:
 1. address the strongest systemic service gaps in the evidence,
 2. be feasible for a German university / Studierendenwerk context,
@@ -416,6 +457,21 @@ Diversity constraints:
                 "portfolio_summary": "Ein einzelner Service-Innovationsvorschlag wurde aus den stärksten Signalen generiert.",
                 "innovations": [report],
             }
+
+        stakeholder_profiles = report.get("stakeholder_profiles", [])
+        if not isinstance(stakeholder_profiles, list):
+            report["stakeholder_profiles"] = []
+        else:
+            report["stakeholder_profiles"] = [
+                {
+                    "name": profile["name"],
+                    "description": self._limit_description(profile["description"], 2, 180),
+                }
+                for profile in stakeholder_profiles
+                if isinstance(profile, dict)
+                and profile.get("name")
+                and profile.get("description")
+            ]
 
         innovations = report.get("innovations")
         if not isinstance(innovations, list) or not innovations:

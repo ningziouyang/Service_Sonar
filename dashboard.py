@@ -1324,7 +1324,30 @@ def render_stakeholder_detail(name: str, count: int) -> str:
 """
 
 
-def render_stakeholders(stakeholder_counts):
+def render_stakeholders(stakeholder_counts, reports):
+    stakeholder_descriptions = {}
+
+    if reports:
+        latest_report = parse_json(
+            reports[0].get("report_json")
+        )
+
+        profiles = latest_report.get(
+            "stakeholder_profiles",
+            [],
+        )
+
+        if isinstance(profiles, list):
+            stakeholder_descriptions = {
+                str(profile.get("name")): str(
+                    profile.get("description")
+                )
+                for profile in profiles
+                if isinstance(profile, dict)
+                and profile.get("name")
+                and profile.get("description")
+            }
+
     top_stakeholders = stakeholder_counts.most_common(6)
     if not top_stakeholders:
         top_stakeholders = [
@@ -1351,7 +1374,7 @@ def render_stakeholders(stakeholder_counts):
       <div class="sh-ov-card{active_class}">
         <div class="sh-ov-icon"><i class="ti ti-building-community"></i></div>
         <div class="sh-ov-name">{esc(name)}</div>
-        <div class="sh-ov-role">{stakeholder_role(name)}</div>
+        <div class="sh-ov-role">{esc(stakeholder_descriptions.get(name, stakeholder_role(name)))}</div>
         <div class="sh-ov-badges"><span class="badge {badge_class}">{count} Signale</span></div>
         <div class="sh-occ"><div class="occ-dot {gap_class}"></div><span>{occupancy}</span></div>
       </div>
@@ -1764,7 +1787,7 @@ def main():
     render_pipeline(status_counts)
     render_problem_dashboard(groups, len(analyses))
     render_cluster_section(groups, len(analyses))
-    render_stakeholders(stakeholder_counts)
+    render_stakeholders(stakeholder_counts, reports)
     render_innovation_new(reports, groups)
     render_status_lab(records, analyses, status_counts)
     render_footer()
