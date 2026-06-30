@@ -376,6 +376,132 @@ Diversity constraints:
             {"role": "system", "content": system_prompt.strip()},
             {"role": "user", "content": user_prompt},
         ]
+    
+    def generate_from_signal(self, signal_text):
+        signal_text = " ".join(str(signal_text or "").split())
+
+        if len(signal_text) < 12:
+            raise ValueError(
+                "Bitte beschreibe die beobachtete Lücke in mindestens 12 Zeichen."
+            )
+
+        system_prompt = """
+Du bist ein Service-Innovation-Stratege für studentische Unterstützungssysteme
+an deutschen Hochschulen.
+
+Analysiere genau ein vom Nutzer beschriebenes Signal oder eine vermutete
+Versorgungslücke. Entwickle daraus genau eine konkrete und realistisch
+umsetzbare Serviceinnovation.
+
+Return exactly one JSON object. No markdown, no commentary, no text outside JSON.
+All values must be written in German.
+
+Use exactly this structure:
+{
+  "cluster": "Passendes systemisches Problemcluster",
+  "gap_summary": "1-2 Sätze zur erkannten Versorgungslücke",
+  "opportunity": "Einprägsamer Name einer konkreten Serviceidee",
+  "solution": "2-4 konkrete Sätze zur Funktionsweise und Servicearchitektur",
+  "target": "Primäre Zielgruppe",
+  "stakeholder": "Zuständige oder beteiligte Akteure",
+  "evidence": "Warum der eingegebene Hinweis auf eine relevante Lücke deutet; nur Problemlage, keine Wiederholung der Lösung",
+  "implementation_steps": [
+    "Pilot: benannter Akteur, konkrete Testgruppe und beobachtbares Ergebnis",
+    "Integration: konkrete Einbindung in einen bestehenden Prozess oder Kanal",
+    "Evaluation: messbares Erfolgskriterium und Entscheidung über Skalierung"
+  ],
+  "risk": "Zentrales Umsetzungsrisiko oder ethische Grenze"
+}
+
+Rules:
+1. Do not invent statistics, laws, existing services, institutional procedures or facts not contained in the signal.
+2. If the signal is ambiguous, state the uncertainty in gap_summary or risk instead of inventing details.
+3. The concept must be more specific than a generic information campaign or counselling offer.
+4. Every implementation step must name an actor, an action and an observable output or decision.
+5. Evidence must describe the underlying need or service gap, not advertise the proposed solution.
+"""
+
+        messages = [
+            {
+                "role": "system",
+                "content": system_prompt.strip(),
+            },
+            {
+                "role": "user",
+                "content": (
+                    "Vom Nutzer beschriebenes Signal oder Versorgungslücke:\n\n"
+                    f"{signal_text}"
+                ),
+            },
+        ]
+
+        errors = []
+
+        for provider in self.providers:
+            try:
+                raw_response = self._call_provider(
+                    provider,
+                    messages,
+                )
+
+                result = self._extract_json_object(
+                    raw_response
+                )
+
+                required_fields = (
+                    "cluster",
+                    "gap_summary",
+                    "opportunity",
+                    "solution",
+                    "target",
+                    "stakeholder",
+                    "evidence",
+                    "implementation_steps",
+                    "risk",
+                )
+
+                missing = [
+                    field
+                    for field in required_fields
+                    if not result.get(field)
+                ]
+
+                if missing:
+                    raise ValueError(
+                        "Signal innovation missing required fields: "
+                        + ", ".join(missing)
+                    )
+
+                if not isinstance(
+                    result.get("implementation_steps"),
+                    list,
+                ):
+                    result["implementation_steps"] = [
+                        str(result["implementation_steps"])
+                    ]
+
+                result["llm_metadata"] = {
+                    "generated_by_llm": True,
+                    "mode": "single_signal",
+                    "provider": provider["name"],
+                    "model": provider["model"],
+                    "created_at_utc": datetime.now(
+                        timezone.utc
+                    ).isoformat(),
+                }
+
+                return result
+
+            except Exception as exc:
+                errors.append(
+                    f"{provider['name']} failed: {exc}"
+                )
+
+        raise RuntimeError(
+            "Keine LLM-Verbindung konnte die Serviceidee generieren. "
+            + " | ".join(errors)
+        )
+
 
     def _retry_after_seconds(self, exc):
         response = getattr(exc, "response", None)

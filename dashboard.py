@@ -5,6 +5,7 @@ from collections import Counter, defaultdict
 from pathlib import Path
 from textwrap import dedent
 import re
+from agent4_innovator import Agent4Innovator
 
 import streamlit as st
 
@@ -651,6 +652,28 @@ div[class*="st-key-stakeholder_card_wrap_"] .sh-ov-card *{
   color:var(--grn600)!important;
 }
 
+.st-key-reopen_signal_idea {
+  width:100%;
+  margin:18px 0 0;
+}
+
+.st-key-reopen_signal_idea div[data-testid="stButton"] button {
+  min-height:48px!important;
+  border-radius:14px!important;
+  border:1px solid var(--p600)!important;
+  background:var(--p600)!important;
+  color:white!important;
+  font-size:12px!important;
+  font-weight:500!important;
+  padding:0 16px!important;
+}
+
+.st-key-reopen_signal_idea div[data-testid="stButton"] button:hover {
+  border-color:var(--p800)!important;
+  background:var(--p800)!important;
+  color:white!important;
+}
+
 .service-modal-card {
   padding:4px 2px 8px;
 }
@@ -753,19 +776,96 @@ div[class*="st-key-stakeholder_card_wrap_"] .sh-ov-card *{
 .st-key-innovation_form div[data-testid="stHorizontalBlock"]{max-width:none;margin:0;gap:10px;align-items:center;}
 .st-key-innovation_form div[data-testid="stHorizontalBlock"]+div[data-testid="stHorizontalBlock"]{margin-top:12px;justify-content:flex-start;}
 .st-key-innovation_form div[data-testid="stHorizontalBlock"]+div[data-testid="stHorizontalBlock"]>div[data-testid="column"]{flex:0 0 auto!important;width:auto!important;min-width:0!important;}
-.st-key-innovation_form div[data-testid="stTextInput"]{margin:0!important;overflow:visible!important;}
-.st-key-innovation_form div[data-testid="stTextInput"]>div{height:52px!important;overflow:visible!important;}
-.st-key-innovation_form div[data-baseweb="input"]{height:52px!important;min-height:52px!important;border-radius:999px!important;overflow:hidden!important;background:white!important;}
-.st-key-innovation_form div[data-testid="stTextInput"] input{height:52px!important;min-height:52px!important;line-height:52px!important;border-radius:999px!important;border:1px solid #d8d4f8!important;padding:0 20px!important;background:white!important;font-size:14px!important;box-sizing:border-box!important;}
-.st-key-innovation_form div[data-testid="stTextInput"] input:focus{border-color:var(--p600)!important;box-shadow:0 0 0 2px rgba(83,74,183,.12)!important;}
+
+.st-key-innovation_form div[data-testid="stTextInput"]{
+  margin:0!important;
+  padding:0!important;
+  background:transparent!important;
+  border:0!important;
+  box-shadow:none!important;
+  overflow:visible!important;
+}
+
+.st-key-innovation_form div[data-testid="stTextInput"] > div{
+  height:52px!important;
+  min-height:52px!important;
+  margin:0!important;
+  padding:0!important;
+  background:transparent!important;
+  border:0!important;
+  box-shadow:none!important;
+}
+
+.st-key-innovation_form div[data-testid="stTextInput"] div[data-baseweb="input"]{
+  height:52px!important;
+  min-height:52px!important;
+  width:100%!important;
+  margin:0!important;
+  padding:0!important;
+  border-radius:999px!important;
+  background:white!important;
+  border:1px solid #d8d4f8!important;
+  box-shadow:none!important;
+  overflow:hidden!important;
+}
+
+.st-key-innovation_form div[data-testid="stTextInput"] div[data-baseweb="input"]::before,
+.st-key-innovation_form div[data-testid="stTextInput"] div[data-baseweb="input"]::after{
+  display:none!important;
+  content:none!important;
+}
+
+.st-key-innovation_form div[data-testid="stTextInput"] div[data-baseweb="base-input"]{
+  height:52px!important;
+  min-height:52px!important;
+  width:100%!important;
+  margin:0!important;
+  padding:0!important;
+  background:transparent!important;
+  border:0!important;
+  box-shadow:none!important;
+}
+
+.st-key-innovation_form div[data-testid="stTextInput"] input{
+  height:52px!important;
+  min-height:52px!important;
+  width:100%!important;
+  margin:0!important;
+  padding:0 20px!important;
+  border:0!important;
+  border-radius:999px!important;
+  background:transparent!important;
+  box-shadow:none!important;
+  outline:none!important;
+  appearance:none!important;
+  line-height:normal!important;
+  font-size:14px!important;
+  box-sizing:border-box!important;
+}
+
+.st-key-innovation_form div[data-testid="stTextInput"]:focus-within div[data-baseweb="input"]{
+  border-color:var(--p600)!important;
+  box-shadow:0 0 0 2px rgba(83,74,183,.12)!important;
+}
+
+.st-key-innovation_form div[data-testid="stTextInput"] [aria-invalid="true"]{
+  border:0!important;
+  box-shadow:none!important;
+  outline:none!important;
+}
+
+.st-key-innovation_form [data-testid="InputInstructions"],
+.st-key-innovation_form [data-testid="stTextInput"] small,
+.st-key-innovation_form [data-testid="stTextInput"] [aria-live="polite"]{
+  display:none!important;
+}
+
 .st-key-innovation_form div[data-testid="stButton"]{margin:0!important;}
 .st-key-innovation_form div[data-testid="stButton"] button{min-height:40px;border-radius:999px;padding:0 16px;border:1px solid #d8d4f8;background:white;color:var(--p600);font-size:12px;font-weight:400;white-space:nowrap;}
 .st-key-innovation_form div[data-testid="stButton"] button:hover{border-color:var(--p600);background:#f8f7ff;color:var(--p800);}
 .st-key-analyze_signal button{height:52px!important;min-height:52px!important;padding:0 22px!important;background:var(--p600)!important;color:white!important;border:1px solid var(--p600)!important;font-size:14px!important;font-weight:500!important;}
 .st-key-analyze_signal button:hover{background:var(--p800)!important;color:white!important;border:1px solid var(--p800)!important;}
 .ai-result-box{max-width:var(--max);margin:18px auto 0;background:white;border:0.5px solid var(--border);border-radius:var(--rlg);padding:22px;}
-
-/*  */
 
 .ai-box { background:var(--p50); border-radius:var(--rxl); padding:36px; border:0.5px solid var(--border); }
 .ai-result { background:white; border:0.5px solid #ddd; border-radius:var(--rlg); padding:24px; font-size:14px; line-height:1.7; color:#333; }
@@ -808,6 +908,22 @@ div[class*="st-key-stakeholder_card_wrap_"] .sh-ov-card *{
 .stTabs [data-baseweb="tab"] { color:var(--muted); font-size:13px; }
 .stTabs [aria-selected="true"] { color:var(--p600) !important; }
 .stAlert { border-radius:var(--rmd); }
+.st-key-innovation_form .stAlert,
+.st-key-innovation_form div[data-baseweb="notification"] {
+  margin-top:18px!important;
+  border:0!important;
+  background:rgba(226,75,74,.14)!important;
+  color:var(--red600)!important;
+  border-radius:14px!important;
+  box-shadow:none!important;
+}
+
+.st-key-innovation_form .stAlert p,
+.st-key-innovation_form div[data-baseweb="notification"] p,
+.st-key-innovation_form div[data-baseweb="notification"] div {
+  color:var(--red600)!important;
+  font-weight:500!important;
+}
 
 @media(max-width:900px) {
   .nav-links { display:none; }
@@ -1157,6 +1273,83 @@ def show_service_innovation_dialog(
 
     <div class="service-modal-copy">
       {esc(risk)}
+    </div>
+  </div>
+</div>
+"""
+    )
+
+def set_signal_suggestion(text: str) -> None:
+    st.session_state.signal_input = text
+
+
+@st.dialog("Neue Serviceidee", width="large")
+def show_generated_signal_dialog(innovation: dict) -> None:
+    steps = innovation.get("implementation_steps", [])
+
+    if not isinstance(steps, list):
+        steps = [str(steps)]
+
+    steps_html = "".join(
+        f"<li>{esc(step)}</li>"
+        for step in steps
+        if str(step).strip()
+    )
+
+    render_html(
+        f"""
+<div class="service-modal-card">
+  <div class="service-modal-kicker">
+    Interaktive Service Innovation
+  </div>
+
+  <div class="service-modal-title">
+    {esc(innovation.get("opportunity", "Neue Serviceidee"))}
+  </div>
+
+  <div class="service-modal-meta">
+    <span>Cluster: {esc(innovation.get("cluster", "—"))}</span>
+    <span>Zielgruppe: {esc(innovation.get("target", "—"))}</span>
+    <span>Stakeholder: {esc(innovation.get("stakeholder", "—"))}</span>
+  </div>
+
+  <div class="service-modal-section">
+    <div class="service-modal-label">Erkannte Lücke</div>
+    <div class="service-modal-copy">
+      {esc(innovation.get("gap_summary", ""))}
+    </div>
+  </div>
+
+  <div class="service-modal-section">
+    <div class="service-modal-label">Konzept</div>
+    <div class="service-modal-copy">
+      {esc(innovation.get("solution", ""))}
+    </div>
+  </div>
+
+  <div class="service-modal-grid">
+    <div class="service-modal-box">
+      <div class="service-modal-label">Warum diese Idee?</div>
+      <div class="service-modal-copy">
+        {esc(innovation.get("evidence", ""))}
+      </div>
+    </div>
+
+    <div class="service-modal-box">
+      <div class="service-modal-label">Umsetzungsschritte</div>
+      <ol class="service-modal-steps">
+        {steps_html}
+      </ol>
+    </div>
+  </div>
+
+  <div class="service-modal-risk">
+    <div class="service-modal-label">
+      Risiko / ethische Grenze
+    </div>
+
+    <div class="service-modal-copy">
+      {esc(innovation.get("risk", ""))}
     </div>
   </div>
 </div>
@@ -2227,54 +2420,51 @@ def render_innovation_new(reports, groups):
 
         suggestion_cols = st.columns([1.15, 1.25, 1.55, 1])
 
-        for column, (label, value) in zip(suggestion_cols, suggestions):
+        for column, (label, value) in zip(
+            suggestion_cols,
+            suggestions,
+        ):
             with column:
-                if st.button(
+                st.button(
                     label,
                     use_container_width=True,
                     key=f"suggestion_{label}",
+                    on_click=set_signal_suggestion,
+                    args=(value,),
+                )
+
+        if analyze_clicked:
+            if len(signal.strip()) < 12:
+                st.warning(
+                    "Bitte beschreibe die beobachtete Lücke etwas genauer."
+                )
+            else:
+                try:
+                    with st.spinner("Serviceidee wird entwickelt..."):
+                        innovator = Agent4Innovator()
+                        result = innovator.generate_from_signal(signal)
+
+                    st.session_state.generated_signal_innovation = result
+                    show_generated_signal_dialog(result)
+
+                except Exception as exc:
+                    st.error(
+                        "Die Serviceidee konnte gerade nicht generiert werden: "
+                        f"{exc}"
+                    )
+
+        existing_result = st.session_state.get(
+            "generated_signal_innovation"
+        )
+
+        if existing_result:
+            with st.container(key="reopen_signal_idea"):
+                if st.button(
+                    "↗ Letzte Serviceidee erneut öffnen",
+                    key="reopen_generated_signal_innovation",
+                    use_container_width=True,
                 ):
-                    st.session_state.signal_input = value
-                    st.rerun()
-
-    if analyze_clicked:
-        if not signal.strip():
-            st.warning(
-                "Bitte zuerst eine Lücke oder ein Signal eingeben."
-            )
-        else:
-            result = generate_service_idea(signal)
-
-            render_html(
-                f"""
-<div class="ai-inner">
-  <div class="ai-result-box">
-    <div class="ai-kicker">
-      Generierte Serviceidee
-    </div>
-
-    <div class="ai-name">
-      {esc(result["idea"])}
-    </div>
-
-    <p>
-      <strong>Cluster:</strong>
-      {esc(result["cluster"])}
-    </p>
-
-    <p>
-      <strong>Konzept:</strong>
-      {esc(result["concept"])}
-    </p>
-
-    <p>
-      <strong>Stakeholder:</strong>
-      {esc(result["stakeholder"])}
-    </p>
-  </div>
-</div>
-"""
-    )
+                    show_generated_signal_dialog(existing_result)
 
 
 def render_innovation(reports, groups):
