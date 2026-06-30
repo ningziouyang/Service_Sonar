@@ -22,41 +22,95 @@ DB_FILE = Path(__file__).with_name("service_sonar.db")
 
 def sync_streamlit_secrets_to_env():
     """Expose Streamlit Cloud secrets as env vars for the agent modules."""
-    secret_keys = (
-        "GROQ_API_KEY",
-        "GROQ_BASE_URL",
-        "GROQ_MODEL",
-        "OPENAI_API_KEY",
-        "OPENAI_BASE_URL",
-        "OPENAI_MODEL",
-        "OPENROUTER_API_KEY",
-        "OPENROUTER_BASE_URL",
-        "OPENROUTER_MODEL",
-        "DEEPSEEK_API_KEY",
-        "DEEPSEEK_BASE_URL",
-        "DEEPSEEK_MODEL",
-        "OLLAMA_ENABLED",
-        "OLLAMA_API_KEY",
-        "OLLAMA_BASE_URL",
-        "OLLAMA_MODEL",
-        "AGENT4_PROVIDER_ORDER",
-        "AGENT4_MAX_RETRIES",
-        "AGENT4_RETRY_BASE_SECONDS",
-        "AGENT4_MAX_RETRY_SLEEP",
-        "AGENT4_TEMPERATURE",
-    )
+    secret_specs = {
+        "GROQ_API_KEY": ("groq", "api_key"),
+        "GROQ_BASE_URL": ("groq", "base_url"),
+        "GROQ_MODEL": ("groq", "model"),
+        "OPENAI_API_KEY": ("openai", "api_key"),
+        "OPENAI_BASE_URL": ("openai", "base_url"),
+        "OPENAI_MODEL": ("openai", "model"),
+        "OPENROUTER_API_KEY": ("openrouter", "api_key"),
+        "OPENROUTER_BASE_URL": ("openrouter", "base_url"),
+        "OPENROUTER_MODEL": ("openrouter", "model"),
+        "DEEPSEEK_API_KEY": ("deepseek", "api_key"),
+        "DEEPSEEK_BASE_URL": ("deepseek", "base_url"),
+        "DEEPSEEK_MODEL": ("deepseek", "model"),
+        "OLLAMA_ENABLED": ("ollama", "enabled"),
+        "OLLAMA_API_KEY": ("ollama", "api_key"),
+        "OLLAMA_BASE_URL": ("ollama", "base_url"),
+        "OLLAMA_MODEL": ("ollama", "model"),
+        "AGENT4_PROVIDER_ORDER": ("agent4", "provider_order"),
+        "AGENT4_MAX_RETRIES": ("agent4", "max_retries"),
+        "AGENT4_RETRY_BASE_SECONDS": ("agent4", "retry_base_seconds"),
+        "AGENT4_MAX_RETRY_SLEEP": ("agent4", "max_retry_sleep"),
+        "AGENT4_TEMPERATURE": ("agent4", "temperature"),
+    }
 
-    for key in secret_keys:
-        if os.getenv(key):
+    def read_secret(mapping, names):
+        if not hasattr(mapping, "get"):
+            return None
+
+        for name in names:
+            try:
+                value = mapping.get(name)
+            except Exception:
+                value = None
+
+            if value:
+                return value
+
+        return None
+
+    try:
+        secrets = st.secrets
+    except Exception:
+        secrets = None
+
+    if not secrets:
+        return
+
+    for env_key, (section_name, short_name) in secret_specs.items():
+        if os.getenv(env_key):
             continue
 
-        try:
-            value = st.secrets.get(key)
-        except Exception:
-            value = None
+        root_names = (
+            env_key,
+            env_key.lower(),
+            env_key.lower().replace("_", "-"),
+        )
+        value = read_secret(secrets, root_names)
+
+        if not value:
+            section_names = (
+                section_name,
+                section_name.upper(),
+                section_name.capitalize(),
+                "general",
+                "llm",
+                "agent4",
+            )
+
+            for candidate_section in section_names:
+                try:
+                    section = secrets.get(candidate_section)
+                except Exception:
+                    section = None
+
+                if not section:
+                    continue
+
+                section_value_names = (
+                    env_key,
+                    env_key.lower(),
+                    short_name,
+                    short_name.upper(),
+                )
+                value = read_secret(section, section_value_names)
+                if value:
+                    break
 
         if value:
-            os.environ[key] = str(value)
+            os.environ[env_key] = str(value)
 
 
 sync_streamlit_secrets_to_env()
