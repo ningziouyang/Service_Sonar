@@ -1,11 +1,13 @@
 import sqlite3
 from datetime import datetime
+from pathlib import Path
 
 
 STATUS_REJECTED = -1
 STATUS_CLEANED = 1
 STATUS_HUMAN_REVIEW = 3
 
+DB_FILE = Path(__file__).with_name("service_sonar.db")
 
 class HumanReviewQueue:
     """
@@ -17,8 +19,8 @@ class HumanReviewQueue:
     - Jede Entscheidung wird in human_review_log dokumentiert.
     """
 
-    def __init__(self, db_file="service_sonar.db"):
-        self.db_file = db_file
+    def __init__(self, db_file=DB_FILE):
+         self.db_file = str(db_file)
 
     def _connect(self):
         conn = sqlite3.connect(self.db_file)
@@ -34,6 +36,22 @@ class HumanReviewQueue:
             """
         )
         return conn
+    
+    def count_pending(self) -> int:
+         """Gibt die aktuelle Zahl offener Human-Review-Fälle zurück."""
+         conn = self._connect()
+         cursor = conn.cursor()
+
+         cursor.execute(
+             "SELECT COUNT(*) FROM forum_posts WHERE status = ?",
+             (STATUS_HUMAN_REVIEW,),
+         )
+
+         count = int(cursor.fetchone()[0])
+
+         conn.close()
+         return count
+    
 
     def list_pending(self, limit=10):
         conn = self._connect()
