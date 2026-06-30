@@ -315,7 +315,15 @@ The JSON must contain these top-level fields:
   "stakeholder_profiles": [
     {
       "name": "Exakter Name aus top_stakeholders",
-      "description": "Maximal 2 kurze datenbasierte Sätze und höchstens 180 Zeichen: Rolle im Problemfeld und häufige zugeordnete Themen"
+      "description": "Maximal 2 kurze datenbasierte Sätze und höchstens 180 Zeichen: Rolle im Problemfeld und häufige zugeordnete Themen",
+      "task_areas": [
+        {
+          "title": "Kurzer Name eines Arbeitsfelds",
+          "status": "active | overloaded | service_gap",
+          "evidence": "Ein kurzer datenbasierter Satz aus Clustern oder Beispielen",
+          "recommendation": "Ein konkreter Verbesserungsvorschlag in einem Satz"
+        }
+      ]
     }
   ],
   "innovations": [
@@ -333,6 +341,9 @@ The JSON must contain these top-level fields:
 }
 
 The number of stakeholder_profiles must exactly match the number of entries in top_stakeholders.
+Each stakeholder profile must contain 3 or 4 task_areas.
+Use status "active" for an existing responsibility without a strong gap signal, "overloaded" for an existing but problematic process, and "service_gap" for a recurring need without a clearly covered service.
+For "overloaded", recommend one concrete process improvement. For "service_gap", recommend one concrete new service idea. Keep all evidence and recommendations short.
 The innovation portfolio must:
 1. address the strongest systemic service gaps in the evidence,
 2. be feasible for a German university / Studierendenwerk context,
@@ -462,16 +473,44 @@ Diversity constraints:
         if not isinstance(stakeholder_profiles, list):
             report["stakeholder_profiles"] = []
         else:
-            report["stakeholder_profiles"] = [
-                {
-                    "name": profile["name"],
-                    "description": self._limit_description(profile["description"], 2, 180),
-                }
-                for profile in stakeholder_profiles
-                if isinstance(profile, dict)
-                and profile.get("name")
-                and profile.get("description")
-            ]
+            normalized_profiles = []
+
+            for profile in stakeholder_profiles:
+                if not isinstance(profile, dict):
+                    continue
+                if not profile.get("name") or not profile.get("description"):
+                    continue
+
+                normalized_areas = []
+                task_areas = profile.get("task_areas", [])
+
+                if isinstance(task_areas, list):
+                    for area in task_areas[:4]:
+                        if not isinstance(area, dict) or not area.get("title"):
+                            continue
+
+                        status = str(area.get("status", "active")).strip().lower()
+                        if status not in {"active", "overloaded", "service_gap"}:
+                            status = "active"
+
+                        normalized_areas.append(
+                            {
+                                "title": self._shorten(area.get("title"), 60),
+                                "status": status,
+                                "evidence": self._shorten(area.get("evidence"), 160),
+                                "recommendation": self._shorten(area.get("recommendation"), 180),
+                            }
+                        )
+
+                normalized_profiles.append(
+                    {
+                        "name": profile["name"],
+                        "description": self._limit_description(profile["description"], 2, 180),
+                        "task_areas": normalized_areas,
+                    }
+                )
+
+            report["stakeholder_profiles"] = normalized_profiles
 
         innovations = report.get("innovations")
         if not isinstance(innovations, list) or not innovations:

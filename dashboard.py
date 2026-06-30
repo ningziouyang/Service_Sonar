@@ -310,6 +310,71 @@ footer { display:none !important; }
 .sh-ov-card { background:white; border:0.5px solid var(--border); border-radius:var(--rlg); padding:18px; border-top:3px solid transparent; transition:box-shadow .2s, transform .15s; }
 .sh-ov-card:hover { box-shadow:0 4px 20px rgba(83,74,183,.1); transform:translateY(-1px); }
 .sh-ov-card.active { border-top-color:var(--p600); box-shadow:0 4px 20px rgba(83,74,183,.15); }
+div[class*="st-key-stakeholder_card_wrap_"]{
+  position:relative!important;
+  height:218px!important;
+  min-height:218px!important;
+  margin:0!important;
+  padding:0!important;
+}
+
+div[class*="st-key-stakeholder_card_wrap_"] div[data-testid="stVerticalBlock"]{
+  position:relative!important;
+  height:218px!important;
+  min-height:218px!important;
+  gap:0!important;
+  margin:0!important;
+  padding:0!important;
+}
+
+div[class*="st-key-stakeholder_card_wrap_"] div[data-testid="stElementContainer"]:has(.sh-ov-card){
+  position:absolute!important;
+  inset:0!important;
+  z-index:1!important;
+  width:100%!important;
+  height:218px!important;
+  margin:0!important;
+  padding:0!important;
+}
+
+div[class*="st-key-stakeholder_card_wrap_"] div[data-testid="stButton"]{
+  position:absolute!important;
+  inset:0!important;
+  z-index:2!important;
+  width:100%!important;
+  height:218px!important;
+  margin:0!important;
+  padding:0!important;
+  pointer-events:auto!important;
+}
+
+div[class*="st-key-stakeholder_card_wrap_"] div[data-testid="stButton"] button{
+  position:absolute!important;
+  inset:0!important;
+  width:100%!important;
+  height:218px!important;
+  min-height:218px!important;
+  margin:0!important;
+  padding:0!important;
+  border:0!important;
+  background:transparent!important;
+  color:transparent!important;
+  font-size:0!important;
+  box-shadow:none!important;
+  cursor:pointer!important;
+  pointer-events:auto!important;
+}
+
+div[class*="st-key-stakeholder_card_wrap_"] .sh-ov-card{
+  width:100%!important;
+  height:218px!important;
+  margin:0!important;
+  pointer-events:none!important;
+}
+
+div[class*="st-key-stakeholder_card_wrap_"] .sh-ov-card *{
+  pointer-events:none!important;
+}
 .sh-ov-icon { font-size:20px; color:var(--p600); margin-bottom:8px; }
 .sh-ov-name { font-size:14px; font-weight:500; margin-bottom:4px; color:var(--text); }
 .sh-ov-role { font-size:12px; color:var(--muted); margin-bottom:10px; line-height:1.45; min-height:52px; }
@@ -727,6 +792,22 @@ def stakeholder_badge_class(name: str) -> str:
         return "b-l"
     return "b-i"
 
+
+def normalize_stakeholder_name(name: str) -> str:
+    normalized = str(name or "").strip().lower()
+    normalized = normalized.replace("ö", "oe")
+    normalized = normalized.replace("ä", "ae")
+    normalized = normalized.replace("ü", "ue")
+    normalized = normalized.replace("ß", "ss")
+
+    return "".join(
+        character
+        for character in normalized
+        if character.isalnum()
+    )
+
+def select_stakeholder(name: str) -> None:
+    st.session_state.selected_stakeholder = name
 
 @st.cache_data(ttl=20, show_spinner=False)
 def load_data():
@@ -1324,120 +1405,329 @@ def render_stakeholder_detail(name: str, count: int) -> str:
 """
 
 
+# Agent-4 style stakeholder detail rendering
+def render_agent4_stakeholder_detail(name, count, profile, status_label, status_color):
+    task_areas = profile.get("task_areas", []) if isinstance(profile, dict) else []
+
+    if not task_areas:
+        return render_stakeholder_detail(name, count)
+
+    status_meta = {
+        "active": {
+            "label": "aktiv",
+            "dot": "var(--amb400)",
+            "badge": "sh-badge-open",
+            "potential_style": "sh-potential-neutral",
+            "potential_title": "Bestehende Zuständigkeit",
+        },
+        "overloaded": {
+            "label": "überlastet",
+            "dot": "var(--red400)",
+            "badge": "sh-badge-overloaded",
+            "potential_style": "sh-potential-red",
+            "potential_title": "Optimierungspotenzial",
+        },
+        "service_gap": {
+            "label": "offen",
+            "dot": "var(--grn400)",
+            "badge": "sh-badge-open",
+            "potential_style": "sh-potential-green",
+            "potential_title": "Neuer Service möglich",
+        },
+    }
+
+    problems = []
+    potentials = []
+
+    for area in task_areas[:4]:
+        if not isinstance(area, dict):
+            continue
+
+        status = str(area.get("status", "active")).strip().lower()
+        meta = status_meta.get(status, status_meta["active"])
+        title = str(area.get("title") or "Arbeitsfeld")
+        evidence = str(
+            area.get("evidence")
+            or "Keine zusätzliche Evidenz verfügbar."
+        )
+        recommendation = str(
+            area.get("recommendation")
+            or "Bestehende Zuständigkeit weiter beobachten."
+        )
+
+        problems.append(
+            f"""
+            <div class="sh-problem-item">
+              <div class="sh-problem-title">
+                <span class="sh-problem-dot" style="background:{meta['dot']};"></span>
+                <span>{esc(title)}</span>
+                <span class="sh-problem-badge {meta['badge']}">{esc(meta['label'])}</span>
+              </div>
+              <div class="sh-problem-copy">{esc(recommendation)}</div>
+              <div class="sh-problem-note">{esc(evidence)}</div>
+            </div>
+            """
+        )
+
+        if status in {"overloaded", "service_gap"}:
+            potentials.append(
+                f"""
+                <div class="sh-potential-card {meta['potential_style']}">
+                  <div class="sh-potential-title">{esc(meta['potential_title'])} · {esc(title)}</div>
+                  <div class="sh-potential-copy">{esc(recommendation)}</div>
+                </div>
+                """
+            )
+
+    if not potentials:
+        potentials.append(
+            """
+            <div class="sh-potential-card sh-potential-neutral">
+              <div class="sh-potential-title">Bestehende Zuständigkeit</div>
+              <div class="sh-potential-copy">Aktuell wurde keine deutliche strukturelle Lücke erkannt.</div>
+            </div>
+            """
+        )
+
+    description = profile.get("description") or stakeholder_role(name)
+
+    return f"""
+<div class="sh-detail-head">
+  <div>
+    <div class="sh-detail-identity">
+      <div class="sh-detail-icon"><i class="ti ti-building-community"></i></div>
+      <div>
+        <div class="sh-detail-name">{esc(name)}</div>
+        <div class="sh-detail-subtitle">{esc(description)}</div>
+      </div>
+    </div>
+    <div class="sh-detail-status" style="color:{status_color};">
+      <span class="sh-detail-status-dot" style="background:{status_color};"></span>
+      {esc(status_label)} · {count} erkannte Signale
+    </div>
+  </div>
+</div>
+
+<div class="sh-detail-grid">
+  <div class="sh-detail-column">
+    <div class="sh-detail-label">Aufgabenfelder & Bewertung</div>
+    {''.join(problems)}
+  </div>
+  <div class="sh-detail-column">
+    <div class="sh-detail-label">Innovationspotenzial</div>
+    {''.join(potentials)}
+  </div>
+</div>
+"""
+
+
+@st.fragment
 def render_stakeholders(stakeholder_counts, reports):
-    stakeholder_descriptions = {}
+    latest_report = {}
+    report_cache_key = "no-report"
 
     if reports:
-        latest_report = parse_json(
-            reports[0].get("report_json")
+        latest_report_row = reports[0]
+        latest_report = parse_json(latest_report_row.get("report_json"))
+        report_cache_key = (
+            f"{latest_report_row.get('id', '')}:"
+            f"{latest_report_row.get('created_at', '')}"
         )
 
-        profiles = latest_report.get(
-            "stakeholder_profiles",
-            [],
-        )
+    if st.session_state.get("stakeholder_report_cache_key") != report_cache_key:
+        profiles = latest_report.get("stakeholder_profiles", [])
+        profile_cache = {}
 
         if isinstance(profiles, list):
-            stakeholder_descriptions = {
-                str(profile.get("name")): str(
-                    profile.get("description")
-                )
-                for profile in profiles
-                if isinstance(profile, dict)
-                and profile.get("name")
-                and profile.get("description")
-            }
+            for profile in profiles:
+                if not isinstance(profile, dict) or not profile.get("name"):
+                    continue
+
+                profile_cache[
+                    normalize_stakeholder_name(profile.get("name"))
+                ] = profile
+
+        st.session_state.stakeholder_profile_cache = profile_cache
+        st.session_state.stakeholder_report_cache_key = report_cache_key
+        st.session_state.pop("stakeholder_detail_cache", None)
+        st.session_state.pop("stakeholder_detail_cache_key", None)
+
+    stakeholder_profiles = st.session_state.get(
+        "stakeholder_profile_cache",
+        {},
+    )
+
+    def get_profile(name):
+        return stakeholder_profiles.get(
+            normalize_stakeholder_name(name),
+            {},
+        )
+
+    def stakeholder_status(name):
+        profile = get_profile(name)
+        task_areas = profile.get("task_areas", [])
+        statuses = [
+            str(area.get("status", "active")).strip().lower()
+            for area in task_areas
+            if isinstance(area, dict)
+        ]
+
+        if "overloaded" in statuses:
+            return "Überlastet", "var(--red400)"
+        if "service_gap" in statuses:
+            return "Raum für neue Services", "var(--grn400)"
+        return "Aktiv bearbeitet", "var(--amb400)"
 
     top_stakeholders = stakeholder_counts.most_common(6)
     if not top_stakeholders:
         top_stakeholders = [
             ("Studierendenwerk", 0),
-            ("BAfG-Amt", 0),
+            ("BAföG-Amt", 0),
             ("Hochschule", 0),
         ]
 
-    selected_name, selected_count = top_stakeholders[0]
+    available_names = [name for name, _ in top_stakeholders]
 
-    detail_html = render_stakeholder_detail(
-         selected_name,
-         selected_count,
+    if (
+        "selected_stakeholder" not in st.session_state
+        or st.session_state.selected_stakeholder not in available_names
+    ):
+        st.session_state.selected_stakeholder = available_names[0]
+
+    detail_cache_key = (
+        report_cache_key,
+        tuple(top_stakeholders),
     )
 
-    cards = []
-    for index, (name, count) in enumerate(top_stakeholders):
-        badge_class = stakeholder_badge_class(name)
-        active_class = " active" if index == 0 else ""
-        gap_class = "occ-open" if count and count < 4 else ""
-        occupancy = "Raum f&uuml;r neue Services" if gap_class else "Aktiv bearbeitet"
-        cards.append(
-            f"""
-      <div class="sh-ov-card{active_class}">
-        <div class="sh-ov-icon"><i class="ti ti-building-community"></i></div>
-        <div class="sh-ov-name">{esc(name)}</div>
-        <div class="sh-ov-role">{esc(stakeholder_descriptions.get(name, stakeholder_role(name)))}</div>
-        <div class="sh-ov-badges"><span class="badge {badge_class}">{count} Signale</span></div>
-        <div class="sh-occ"><div class="occ-dot {gap_class}"></div><span>{occupancy}</span></div>
-      </div>
+    if st.session_state.get("stakeholder_detail_cache_key") != detail_cache_key:
+        detail_cache = {}
+
+        for name, count in top_stakeholders:
+            profile = get_profile(name)
+            status_label, status_color = stakeholder_status(name)
+            detail_cache[name] = render_agent4_stakeholder_detail(
+                name,
+                count,
+                profile,
+                status_label,
+                status_color,
+            )
+
+        st.session_state.stakeholder_detail_cache = detail_cache
+        st.session_state.stakeholder_detail_cache_key = detail_cache_key
+
+    render_html(
+        """
+<section class="stakeholder-section" id="stakeholder">
+  <div class="sec-label">Stakeholder Dashboard</div>
+  <h2 class="sec-title">Wer macht was, und was bleibt offen?</h2>
+  <p class="sec-body">Klicke auf eine Stakeholder-Karte. Nur der Stakeholder-Bereich wird aktualisiert; die Seite bleibt an derselben Position.</p>
+</section>
 """
+    )
+
+    for row_start in range(0, len(top_stakeholders), 3):
+        columns = st.columns(3)
+
+        for column, (name, count) in zip(
+            columns,
+            top_stakeholders[row_start:row_start + 3],
+        ):
+            profile = get_profile(name)
+
+            description = (
+                profile.get("description")
+                or stakeholder_role(name)
+            )
+
+            status_label, status_color = stakeholder_status(name)
+            badge_class = stakeholder_badge_class(name)
+
+            active_class = (
+                " active"
+                if name == st.session_state.selected_stakeholder
+                else ""
+            )
+
+            normalized_name = normalize_stakeholder_name(name)
+
+            with column:
+                with st.container(
+                    key=f"stakeholder_card_wrap_{normalized_name}"
+                ):
+
+                    render_html(
+                        f"""
+<div class="sh-ov-card{active_class}">
+  <div class="sh-ov-icon">
+    <i class="ti ti-building-community"></i>
+  </div>
+
+  <div class="sh-ov-name">
+    {esc(name)}
+  </div>
+
+  <div class="sh-ov-role">
+    {esc(description)}
+  </div>
+
+  <div class="sh-ov-badges">
+    <span class="badge {badge_class}">
+      {count} Signale
+    </span>
+  </div>
+
+  <div class="sh-occ">
+    <div
+      class="occ-dot"
+      style="background:{status_color};"
+    ></div>
+
+    <span>
+      {esc(status_label)}
+    </span>
+  </div>
+</div>
+"""
+                    )
+
+                    st.button(
+                        f"Stakeholder {name} auswählen",
+                        key=f"stakeholder_card_{normalized_name}",
+                        use_container_width=True,
+                        on_click=select_stakeholder,
+                        args=(name,),
+                    )
+
+    selected_name = st.session_state.selected_stakeholder
+    detail_cache = st.session_state.get("stakeholder_detail_cache", {})
+    detail_html = detail_cache.get(selected_name)
+
+    if not detail_html:
+        selected_count = dict(top_stakeholders).get(selected_name, 0)
+        selected_profile = get_profile(selected_name)
+        selected_status, selected_color = stakeholder_status(selected_name)
+        detail_html = render_agent4_stakeholder_detail(
+            selected_name,
+            selected_count,
+            selected_profile,
+            selected_status,
+            selected_color,
         )
 
     render_html(
         f"""
-<section class="stakeholder-section" id="stakeholder">
-  <div class="sec-label">Stakeholder Dashboard</div>
-  <h2 class="sec-title">Wer macht was, und was bleibt offen?</h2>
-  <p class="sec-body">Die Karten zeigen, welche Akteure in den analysierten Posts am h&auml;ufigsten auftauchen. Hohe Erw&auml;hnung bedeutet nicht automatisch Verantwortung, aber einen klaren Workshop-Startpunkt.</p>
-  <div class="sh-overview-grid">
-    {''.join(cards)}
-  </div>
-  <div style="
-    display:flex;
-    gap:20px;
-    flex-wrap:wrap;
-    padding:12px 0 24px;
-    font-size:12px;
-    color:var(--muted);
-    border-bottom:0.5px solid var(--border);
-    margin-bottom:24px;
-  ">
-    <span style="display:flex;align-items:center;gap:6px">
-      <span style="
-        width:8px;
-        height:8px;
-        border-radius:50%;
-        background:var(--amb400);
-        display:inline-block;
-      "></span>
-      Aktiv bearbeitet &mdash; bestehende Zust&auml;ndigkeit
-    </span>
-
-    <span style="display:flex;align-items:center;gap:6px">
-      <span style="
-        width:8px;
-        height:8px;
-        border-radius:50%;
-        background:var(--grn400);
-        display:inline-block;
-      "></span>
-      Raum f&uuml;r neue Services &mdash; strukturelle L&uuml;cke erkannt
-    </span>
-
-    <span style="display:flex;align-items:center;gap:6px">
-      <span style="
-        width:8px;
-        height:8px;
-        border-radius:50%;
-        background:var(--red400);
-        display:inline-block;
-      "></span>
-      &Uuml;berlastet &mdash; optimierbar durch neuen Service
-    </span>
+<div style="max-width:var(--max);margin:18px auto 0;">
+  <div style="display:flex;gap:20px;flex-wrap:wrap;padding:12px 0 24px;font-size:12px;color:var(--muted);border-bottom:0.5px solid var(--border);margin-bottom:24px;">
+    <span style="display:flex;align-items:center;gap:6px"><span style="width:8px;height:8px;border-radius:50%;background:var(--amb400);display:inline-block;"></span>Aktiv bearbeitet &mdash; bestehende Zuständigkeit</span>
+    <span style="display:flex;align-items:center;gap:6px"><span style="width:8px;height:8px;border-radius:50%;background:var(--grn400);display:inline-block;"></span>Raum für neue Services &mdash; strukturelle Lücke erkannt</span>
+    <span style="display:flex;align-items:center;gap:6px"><span style="width:8px;height:8px;border-radius:50%;background:var(--red400);display:inline-block;"></span>Überlastet &mdash; optimierbar durch neuen Service</span>
   </div>
 
   <div class="sh-detail-panel" id="sh-detail">
     {detail_html}
   </div>
-</section>
+</div>
 """
     )
 
