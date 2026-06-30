@@ -72,7 +72,7 @@ class Agent3Analyzer:
 
         except Exception as e:
             print(f"[Agent 3 ERROR] API-Aufruf fehlgeschlagen: {e}")
-            return {"error": "API Timeout", "problem_cluster": "Unbekannt"}
+            return None
 
     def run(self, limit=None, offset=0, sleep_seconds=0.0):
         """

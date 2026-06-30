@@ -2,6 +2,7 @@ import argparse
 import hashlib
 import json
 import os
+import re
 import sqlite3
 import time
 from collections import Counter, defaultdict
@@ -170,11 +171,23 @@ class Agent4Innovator:
             return clean
         return clean[: limit - 1].rstrip() + "..."
 
+    def _limit_description(self, text, max_sentences=2, max_chars=180):
+        clean = " ".join(str(text or "").split())
+        sentences = re.split(r"(?<=[.!?])\s+", clean)
+        shortened = " ".join(sentences[:max_sentences]).strip()
+
+        if len(shortened) <= max_chars:
+            return shortened
+
+        return shortened[: max_chars - 1].rstrip() + "…"
+
     def _build_evidence_bundle(self, records, source_signature):
         clusters = Counter()
         urgencies = Counter()
         tones = Counter()
         stakeholders = Counter()
+        stakeholder_clusters = defaultdict(Counter)
+        stakeholder_examples = defaultdict(list)
         cluster_urgencies = defaultdict(Counter)
         representative_pool = []
 
@@ -191,7 +204,20 @@ class Agent4Innovator:
             urgencies[urgency] += 1
             tones[tone] += 1
             cluster_urgencies[cluster][urgency] += 1
-            stakeholders.update(str(item) for item in stakeholder_list if item)
+
+            clean_stakeholders = [
+                str(item).strip()
+                for item in stakeholder_list
+                if str(item).strip()
+            ]
+            stakeholders.update(clean_stakeholders)
+
+            for stakeholder in clean_stakeholders:
+                stakeholder_clusters[stakeholder][cluster] += 1
+                if len(stakeholder_examples[stakeholder]) < 2:
+                    stakeholder_examples[stakeholder].append(
+                        self._shorten(cleaned_text, 220)
+                    )
 
             priority = 0
             if urgency == "Hoch":
@@ -259,8 +285,16 @@ class Agent4Innovator:
             "urgency_distribution": dict(urgencies.most_common()),
             "emotional_tone_distribution": dict(tones.most_common()),
             "top_stakeholders": [
-                {"name": name, "mentions": count}
-                for name, count in stakeholders.most_common(12)
+                {
+                    "name": name,
+                    "mentions": count,
+                    "top_clusters": [
+                        cluster_name
+                        for cluster_name, _ in stakeholder_clusters[name].most_common(3)
+                    ],
+                    "examples": stakeholder_examples[name],
+                }
+                for name, count in stakeholders.most_common(6)
             ],
             "representative_cases": representative_cases,
         }
@@ -273,7 +307,7 @@ Your task is not to summarize complaints. Your task is to generate a portfolio
 of 3-5 concrete, implementable service innovations based on the empirical weak
 signals produced by Agent 3.
 
-Use only the provided aggregated evidence:
+Use only the provided aggregated evidence. Create exactly one stakeholder profile for every name in top_stakeholders. Do not skip any name and do not add new names:
 - problem clusters
 - urgency distribution
 - emotional tone distribution
@@ -288,6 +322,20 @@ Hochschulberatung, International Office, Prüfungsamt, Sozialberatung.
 The JSON must contain these top-level fields:
 {
   "portfolio_summary": "2-3 Sätze, welche Service-Lücken das Portfolio insgesamt adressiert",
+  "stakeholder_profiles": [
+    {
+      "name": "Exakter Name aus top_stakeholders",
+      "description": "Maximal 2 kurze datenbasierte Sätze und höchstens 180 Zeichen: Rolle im Problemfeld und häufige zugeordnete Themen",
+      "task_areas": [
+        {
+          "title": "Kurzer Name eines Arbeitsfelds",
+          "status": "active | overloaded | service_gap",
+          "evidence": "Ein kurzer datenbasierter Satz aus Clustern oder Beispielen",
+          "recommendation": "Ein konkreter Verbesserungsvorschlag in einem Satz"
+        }
+      ]
+    }
+  ],
   "innovations": [
     {
       "cluster": "Zentrales systemisches Problemcluster",
@@ -295,13 +343,21 @@ The JSON must contain these top-level fields:
       "solution": "2-4 Sätze zur Servicearchitektur und zum konkreten Konzept",
       "target": "Primäre Zielgruppe",
       "stakeholder": "Zuständige oder beteiligte Akteure",
-      "evidence": "1-2 Sätze, welche aggregierten Signale die Idee begründen",
-      "implementation_steps": ["Schritt 1", "Schritt 2", "Schritt 3"],
+      "evidence": "1-2 konkrete Sätze ausschließlich zur Problemlage: Welche wiederkehrenden Bedarfe, Beschwerden, Cluster oder Stakeholder-Konflikte begründen die Idee? Die vorgeschlagene Lösung oder ihre Vorteile dürfen hier nicht erwähnt werden.",
+      "implementation_steps": [
+        "Pilot: konkreter erster Test mit benanntem Verantwortlichen und klarer Zielgruppe",
+        "Integration: konkrete Einbindung in einen bestehenden Prozess oder Kanal",
+        "Evaluation: messbares Erfolgskriterium und Entscheidung über Skalierung"
+      ],
       "risk": "Zentrales Umsetzungsrisiko oder ethische Grenze"
     }
   ]
 }
 
+The number of stakeholder_profiles must exactly match the number of entries in top_stakeholders.
+Each stakeholder profile must contain 3 or 4 task_areas.
+Use status "active" for an existing responsibility without a strong gap signal, "overloaded" for an existing but problematic process, and "service_gap" for a recurring need without a clearly covered service.
+For "overloaded", recommend one concrete process improvement. For "service_gap", recommend one concrete new service idea. Keep all evidence and recommendations short.
 The innovation portfolio must:
 1. address the strongest systemic service gaps in the evidence,
 2. be feasible for a German university / Studierendenwerk context,
@@ -309,6 +365,9 @@ The innovation portfolio must:
 4. be more specific than an awareness campaign or generic counselling offer,
 5. explain why the data supports this idea,
 6. avoid inventing raw data, statistics, laws, or institutional procedures.
+7. In "evidence", explain the underlying recurring need or service gap, not the proposed solution itself.
+8. Make every implementation step operational: name an actor, an action, and an observable output or decision. Avoid generic steps such as "Tool entwickeln", "integrieren" or "Mitarbeitende schulen" without further specification.
+9. Structure implementation_steps as Pilot, Integration and Evaluation whenever possible.
 
 Diversity constraints:
 - Generate at least 3 innovations if at least 3 problem clusters exist.
@@ -327,6 +386,132 @@ Diversity constraints:
             {"role": "system", "content": system_prompt.strip()},
             {"role": "user", "content": user_prompt},
         ]
+    
+    def generate_from_signal(self, signal_text):
+        signal_text = " ".join(str(signal_text or "").split())
+
+        if len(signal_text) < 12:
+            raise ValueError(
+                "Bitte beschreibe die beobachtete Lücke in mindestens 12 Zeichen."
+            )
+
+        system_prompt = """
+Du bist ein Service-Innovation-Stratege für studentische Unterstützungssysteme
+an deutschen Hochschulen.
+
+Analysiere genau ein vom Nutzer beschriebenes Signal oder eine vermutete
+Versorgungslücke. Entwickle daraus genau eine konkrete und realistisch
+umsetzbare Serviceinnovation.
+
+Return exactly one JSON object. No markdown, no commentary, no text outside JSON.
+All values must be written in German.
+
+Use exactly this structure:
+{
+  "cluster": "Passendes systemisches Problemcluster",
+  "gap_summary": "1-2 Sätze zur erkannten Versorgungslücke",
+  "opportunity": "Einprägsamer Name einer konkreten Serviceidee",
+  "solution": "2-4 konkrete Sätze zur Funktionsweise und Servicearchitektur",
+  "target": "Primäre Zielgruppe",
+  "stakeholder": "Zuständige oder beteiligte Akteure",
+  "evidence": "Warum der eingegebene Hinweis auf eine relevante Lücke deutet; nur Problemlage, keine Wiederholung der Lösung",
+  "implementation_steps": [
+    "Pilot: benannter Akteur, konkrete Testgruppe und beobachtbares Ergebnis",
+    "Integration: konkrete Einbindung in einen bestehenden Prozess oder Kanal",
+    "Evaluation: messbares Erfolgskriterium und Entscheidung über Skalierung"
+  ],
+  "risk": "Zentrales Umsetzungsrisiko oder ethische Grenze"
+}
+
+Rules:
+1. Do not invent statistics, laws, existing services, institutional procedures or facts not contained in the signal.
+2. If the signal is ambiguous, state the uncertainty in gap_summary or risk instead of inventing details.
+3. The concept must be more specific than a generic information campaign or counselling offer.
+4. Every implementation step must name an actor, an action and an observable output or decision.
+5. Evidence must describe the underlying need or service gap, not advertise the proposed solution.
+"""
+
+        messages = [
+            {
+                "role": "system",
+                "content": system_prompt.strip(),
+            },
+            {
+                "role": "user",
+                "content": (
+                    "Vom Nutzer beschriebenes Signal oder Versorgungslücke:\n\n"
+                    f"{signal_text}"
+                ),
+            },
+        ]
+
+        errors = []
+
+        for provider in self.providers:
+            try:
+                raw_response = self._call_provider(
+                    provider,
+                    messages,
+                )
+
+                result = self._extract_json_object(
+                    raw_response
+                )
+
+                required_fields = (
+                    "cluster",
+                    "gap_summary",
+                    "opportunity",
+                    "solution",
+                    "target",
+                    "stakeholder",
+                    "evidence",
+                    "implementation_steps",
+                    "risk",
+                )
+
+                missing = [
+                    field
+                    for field in required_fields
+                    if not result.get(field)
+                ]
+
+                if missing:
+                    raise ValueError(
+                        "Signal innovation missing required fields: "
+                        + ", ".join(missing)
+                    )
+
+                if not isinstance(
+                    result.get("implementation_steps"),
+                    list,
+                ):
+                    result["implementation_steps"] = [
+                        str(result["implementation_steps"])
+                    ]
+
+                result["llm_metadata"] = {
+                    "generated_by_llm": True,
+                    "mode": "single_signal",
+                    "provider": provider["name"],
+                    "model": provider["model"],
+                    "created_at_utc": datetime.now(
+                        timezone.utc
+                    ).isoformat(),
+                }
+
+                return result
+
+            except Exception as exc:
+                errors.append(
+                    f"{provider['name']} failed: {exc}"
+                )
+
+        raise RuntimeError(
+            "Keine LLM-Verbindung konnte die Serviceidee generieren. "
+            + " | ".join(errors)
+        )
+
 
     def _retry_after_seconds(self, exc):
         response = getattr(exc, "response", None)
@@ -426,6 +611,49 @@ Diversity constraints:
                 "portfolio_summary": "Ein einzelner Service-Innovationsvorschlag wurde aus den stärksten Signalen generiert.",
                 "innovations": [report],
             }
+
+        stakeholder_profiles = report.get("stakeholder_profiles", [])
+        if not isinstance(stakeholder_profiles, list):
+            report["stakeholder_profiles"] = []
+        else:
+            normalized_profiles = []
+
+            for profile in stakeholder_profiles:
+                if not isinstance(profile, dict):
+                    continue
+                if not profile.get("name") or not profile.get("description"):
+                    continue
+
+                normalized_areas = []
+                task_areas = profile.get("task_areas", [])
+
+                if isinstance(task_areas, list):
+                    for area in task_areas[:4]:
+                        if not isinstance(area, dict) or not area.get("title"):
+                            continue
+
+                        status = str(area.get("status", "active")).strip().lower()
+                        if status not in {"active", "overloaded", "service_gap"}:
+                            status = "active"
+
+                        normalized_areas.append(
+                            {
+                                "title": self._shorten(area.get("title"), 60),
+                                "status": status,
+                                "evidence": self._shorten(area.get("evidence"), 160),
+                                "recommendation": self._shorten(area.get("recommendation"), 180),
+                            }
+                        )
+
+                normalized_profiles.append(
+                    {
+                        "name": profile["name"],
+                        "description": self._limit_description(profile["description"], 2, 180),
+                        "task_areas": normalized_areas,
+                    }
+                )
+
+            report["stakeholder_profiles"] = normalized_profiles
 
         innovations = report.get("innovations")
         if not isinstance(innovations, list) or not innovations:
