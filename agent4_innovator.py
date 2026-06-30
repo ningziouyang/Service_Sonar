@@ -7,11 +7,18 @@ import time
 from collections import Counter, defaultdict
 from datetime import datetime, timezone
 
-from dotenv import load_dotenv
-from openai import OpenAI
+try:
+    from openai import OpenAI
+except ModuleNotFoundError:
+    OpenAI = None
 
+try:
+    from dotenv import load_dotenv
+except ModuleNotFoundError:
+    load_dotenv = None
 
-load_dotenv()
+if load_dotenv:
+    load_dotenv()
 
 
 class Agent4Innovator:
@@ -46,6 +53,9 @@ class Agent4Innovator:
         self._init_report_table()
 
     def _load_providers(self):
+        if OpenAI is None:
+            return []
+
         provider_defs = {
             "groq": {
                 "api_key": os.getenv("GROQ_API_KEY"),

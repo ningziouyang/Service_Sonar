@@ -3,15 +3,27 @@ import sqlite3
 import os
 import argparse
 import time
-from openai import OpenAI
-from dotenv import load_dotenv
 
-# Lädt die Umgebungsvariablen
-load_dotenv()
+try:
+    from openai import OpenAI
+except ModuleNotFoundError:
+    OpenAI = None
+
+try:
+    from dotenv import load_dotenv
+except ModuleNotFoundError:
+    load_dotenv = None
+
+# Lädt lokale .env-Dateien, wenn python-dotenv installiert ist.
+if load_dotenv:
+    load_dotenv()
 
 class Agent3Analyzer:
     def __init__(self, db_file="service_sonar.db"):
         self.db_file = db_file
+
+        if OpenAI is None:
+            raise ValueError("[WARNUNG] Das Python-Paket 'openai' ist nicht installiert.")
         
         # ============================================================
         # 🔑 Groq API Konfiguration
