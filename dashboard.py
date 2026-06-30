@@ -128,7 +128,7 @@ footer { display:none !important; }
 .block-container {
   max-width:none !important;
   width:100% !important;
-  padding:0 24px 36px !important;
+  padding:0 24px 0 !important;
   font-family:'DM Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
 .block-container > div[data-testid="stVerticalBlock"]{gap:0!important;}
@@ -900,7 +900,7 @@ div[class*="st-key-stakeholder_card_wrap_"] .sh-ov-card *{
 .record-title { font-size:14px; color:var(--text); line-height:1.5; margin-bottom:8px; }
 .record-json { background:#12112a; color:#d8d4f8; border-radius:var(--rmd); padding:12px 14px; font-size:12px; line-height:1.6; overflow:auto; }
 
-.ss-footer { background:var(--dark); border-radius:var(--rxl) var(--rxl) 0 0; margin-top:24px; padding:36px 44px; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:16px; }
+.ss-footer { background:var(--dark); border-radius:var(--rxl) var(--rxl) 0 0; margin:24px -24px 0; padding:36px 44px; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:16px; }
 .footer-brand { color:white; font-size:15px; font-weight:500; }
 .footer-txt { font-size:13px; color:#77729a; }
 
