@@ -305,7 +305,24 @@ footer { display:none !important; }
 .cl-diag-text { font-size:13px; color:#e0defc; line-height:1.65; }
 .cl-overlap { font-size:11px; color:var(--light); display:flex; align-items:center; gap:5px; line-height:1.45; }
 
-.stakeholder-section { background:#f4f3ff; border-radius:var(--rxl); padding:56px 48px; margin-top:24px; }
+.st-key-stakeholder_dashboard_shell {
+  max-width:var(--max);
+  margin:24px auto 0;
+  padding:56px 48px;
+  background:#f4f3ff;
+  border-radius:var(--rxl);
+}
+
+.st-key-stakeholder_dashboard_shell > div[data-testid="stVerticalBlock"] {
+  gap:0!important;
+}
+
+.stakeholder-section {
+  background:transparent;
+  border-radius:0;
+  padding:0;
+  margin:0 0 28px;
+}
 .sh-overview-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin-bottom:28px; }
 .sh-ov-card { background:white; border:0.5px solid var(--border); border-radius:var(--rlg); padding:18px; border-top:3px solid transparent; transition:box-shadow .2s, transform .15s; }
 .sh-ov-card:hover { box-shadow:0 4px 20px rgba(83,74,183,.1); transform:translateY(-1px); }
@@ -504,6 +521,10 @@ div[class*="st-key-stakeholder_card_wrap_"] .sh-ov-card *{
   background:var(--grn400);
 }
 
+.sh-dot-orange {
+  background:var(--amb400);
+}
+
 .sh-problem-badge {
   font-size:10px;
   padding:2px 8px;
@@ -516,9 +537,15 @@ div[class*="st-key-stakeholder_card_wrap_"] .sh-ov-card *{
   background:var(--red50);
 }
 
+
 .sh-badge-open {
   color:var(--grn600);
   background:var(--grn50);
+}
+
+.sh-badge-active {
+  color:var(--amb600);
+  background:var(--amb50);
 }
 
 .sh-problem-copy {
@@ -1416,7 +1443,7 @@ def render_agent4_stakeholder_detail(name, count, profile, status_label, status_
         "active": {
             "label": "aktiv",
             "dot": "var(--amb400)",
-            "badge": "sh-badge-open",
+            "badge": "sh-badge-active",
             "potential_style": "sh-potential-neutral",
             "potential_title": "Bestehende Zuständigkeit",
         },
@@ -1572,10 +1599,20 @@ def render_stakeholders(stakeholder_counts, reports):
             if isinstance(area, dict)
         ]
 
-        if "overloaded" in statuses:
+        if not statuses:
+            return "Aktiv bearbeitet", "var(--amb400)"
+
+        counts = Counter(statuses)
+        active_count = counts.get("active", 0)
+        overloaded_count = counts.get("overloaded", 0)
+        service_gap_count = counts.get("service_gap", 0)
+
+        if overloaded_count > max(active_count, service_gap_count):
             return "Überlastet", "var(--red400)"
-        if "service_gap" in statuses:
+
+        if service_gap_count > active_count:
             return "Raum für neue Services", "var(--grn400)"
+
         return "Aktiv bearbeitet", "var(--amb400)"
 
     top_stakeholders = stakeholder_counts.most_common(6)
@@ -1616,48 +1653,49 @@ def render_stakeholders(stakeholder_counts, reports):
         st.session_state.stakeholder_detail_cache = detail_cache
         st.session_state.stakeholder_detail_cache_key = detail_cache_key
 
-    render_html(
-        """
+    with st.container(key="stakeholder_dashboard_shell"):
+        render_html(
+            """
 <section class="stakeholder-section" id="stakeholder">
   <div class="sec-label">Stakeholder Dashboard</div>
   <h2 class="sec-title">Wer macht was, und was bleibt offen?</h2>
   <p class="sec-body">Klicke auf eine Stakeholder-Karte. Nur der Stakeholder-Bereich wird aktualisiert; die Seite bleibt an derselben Position.</p>
 </section>
 """
-    )
+        )
 
-    for row_start in range(0, len(top_stakeholders), 3):
-        columns = st.columns(3)
+        for row_start in range(0, len(top_stakeholders), 3):
+            columns = st.columns(3)
 
-        for column, (name, count) in zip(
-            columns,
-            top_stakeholders[row_start:row_start + 3],
-        ):
-            profile = get_profile(name)
+            for column, (name, count) in zip(
+                columns,
+                top_stakeholders[row_start:row_start + 3],
+            ):
+                profile = get_profile(name)
 
-            description = (
-                profile.get("description")
-                or stakeholder_role(name)
-            )
+                description = (
+                    profile.get("description")
+                    or stakeholder_role(name)
+                )
 
-            status_label, status_color = stakeholder_status(name)
-            badge_class = stakeholder_badge_class(name)
+                status_label, status_color = stakeholder_status(name)
+                badge_class = stakeholder_badge_class(name)
 
-            active_class = (
-                " active"
-                if name == st.session_state.selected_stakeholder
-                else ""
-            )
+                active_class = (
+                    " active"
+                    if name == st.session_state.selected_stakeholder
+                    else ""
+                )
 
-            normalized_name = normalize_stakeholder_name(name)
+                normalized_name = normalize_stakeholder_name(name)
 
-            with column:
-                with st.container(
-                    key=f"stakeholder_card_wrap_{normalized_name}"
-                ):
+                with column:
+                    with st.container(
+                        key=f"stakeholder_card_wrap_{normalized_name}"
+                    ):
 
-                    render_html(
-                        f"""
+                        render_html(
+                            f"""
 <div class="sh-ov-card{active_class}">
   <div class="sh-ov-icon">
     <i class="ti ti-building-community"></i>
@@ -1689,35 +1727,35 @@ def render_stakeholders(stakeholder_counts, reports):
   </div>
 </div>
 """
-                    )
+                        )
 
-                    st.button(
-                        f"Stakeholder {name} auswählen",
-                        key=f"stakeholder_card_{normalized_name}",
-                        use_container_width=True,
-                        on_click=select_stakeholder,
-                        args=(name,),
-                    )
+                        st.button(
+                            f"Stakeholder {name} auswählen",
+                            key=f"stakeholder_card_{normalized_name}",
+                            use_container_width=True,
+                            on_click=select_stakeholder,
+                            args=(name,),
+                        )
 
-    selected_name = st.session_state.selected_stakeholder
-    detail_cache = st.session_state.get("stakeholder_detail_cache", {})
-    detail_html = detail_cache.get(selected_name)
+        selected_name = st.session_state.selected_stakeholder
+        detail_cache = st.session_state.get("stakeholder_detail_cache", {})
+        detail_html = detail_cache.get(selected_name)
 
-    if not detail_html:
-        selected_count = dict(top_stakeholders).get(selected_name, 0)
-        selected_profile = get_profile(selected_name)
-        selected_status, selected_color = stakeholder_status(selected_name)
-        detail_html = render_agent4_stakeholder_detail(
-            selected_name,
-            selected_count,
-            selected_profile,
-            selected_status,
-            selected_color,
-        )
+        if not detail_html:
+            selected_count = dict(top_stakeholders).get(selected_name, 0)
+            selected_profile = get_profile(selected_name)
+            selected_status, selected_color = stakeholder_status(selected_name)
+            detail_html = render_agent4_stakeholder_detail(
+                selected_name,
+                selected_count,
+                selected_profile,
+                selected_status,
+                selected_color,
+            )
 
-    render_html(
-        f"""
-<div style="max-width:var(--max);margin:18px auto 0;">
+        render_html(
+            f"""
+<div style="width:100%;margin:18px 0 0;">
   <div style="display:flex;gap:20px;flex-wrap:wrap;padding:12px 0 24px;font-size:12px;color:var(--muted);border-bottom:0.5px solid var(--border);margin-bottom:24px;">
     <span style="display:flex;align-items:center;gap:6px"><span style="width:8px;height:8px;border-radius:50%;background:var(--amb400);display:inline-block;"></span>Aktiv bearbeitet &mdash; bestehende Zuständigkeit</span>
     <span style="display:flex;align-items:center;gap:6px"><span style="width:8px;height:8px;border-radius:50%;background:var(--grn400);display:inline-block;"></span>Raum für neue Services &mdash; strukturelle Lücke erkannt</span>
@@ -1729,7 +1767,7 @@ def render_stakeholders(stakeholder_counts, reports):
   </div>
 </div>
 """
-    )
+        )
 
 def render_innovation_new(reports, groups):
     if "signal_input" not in st.session_state:
