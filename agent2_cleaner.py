@@ -17,7 +17,21 @@ class Agent2Cleaner:
     - Agent 2 macht KEINE semantische Klassifikation.
     - Agent 2 entscheidet nur, ob ein Beitrag sauber genug für Agent 3 ist,
       verworfen wird oder zuerst durch Human Review gehen muss.
+
+    Unterstützt jetzt mehrere Quelltabellen (z.B. forum_posts von Studis Online
+    und hilferuf_posts von hilferuf.de), da beide dasselbe Grundschema haben
+    (id, raw_content, cleaned_content, status).
     """
+
+    # Tabellen, die verarbeitet werden sollen, plus ob ein zusätzlicher
+    # "ist das überhaupt studienbezogen"-Check nötig ist. Studis Online und
+    # das "Studium"-Forum von Hilferuf sind schon thematisch eng genug,
+    # aber breite Hilferuf-Foren wie "Ich" oder "Finanzen" brauchen den
+    # zusätzlichen Check, weil dort auch komplett studienfremde Themen landen.
+    SOURCE_TABLES = {
+        "forum_posts": {"require_student_context": False},
+        "hilferuf_posts": {"require_student_context": True},
+    }
 
     def __init__(self, db_file="service_sonar.db"):
         self.db_file = db_file
@@ -41,6 +55,28 @@ class Agent2Cleaner:
         # Mehrfache Leerzeichen vereinheitlichen
         text = re.sub(r"\s+", " ", text).strip()
 
+        return text
+
+    def _remove_forum_metadata(self, text: str) -> str:
+        """
+        Entfernt typische Forensoftware-Reste, die kein eigentlicher
+        Beitragsinhalt sind (Zeitstempel-Reste, "Antworten"-Links, etc.),
+        die trotz Container-Lock im Scraper gelegentlich mitkommen.
+        """
+        if not text:
+            return ""
+
+        noise_patterns = [
+            r"\bAntworten\b",
+            r"\bZitieren\b",
+            r"\bTeilen\b",
+            r"\b\d+\s*(Sekunden|Minuten|Stunden|Tage|Wochen|Monate|Jahre)\s*her\b",
+            r"\bGestartet von\b.*?(?=\s{2,}|$)",
+        ]
+        for pattern in noise_patterns:
+            text = re.sub(pattern, " ", text, flags=re.IGNORECASE)
+
+        text = re.sub(r"\s+", " ", text).strip()
         return text
 
     def _anonymize_text(self, text: str) -> str:
@@ -130,21 +166,41 @@ class Agent2Cleaner:
 
         return any(keyword in text_lower for keyword in irrelevant_keywords)
 
-    def run(self):
+    def _has_student_context(self, text: str) -> bool:
         """
-        Input:  forum_posts mit status=0
+        Nur für breite, nicht-studienspezifische Quellen relevant (z.B. die
+        Hilferuf-Foren "Ich" oder "Finanzen", die auch komplett studienfremde
+        Themen enthalten). Prüft, ob der Beitrag überhaupt einen erkennbaren
+        Bezug zum Studentenleben hat, bevor er weiterverarbeitet wird.
+        """
+        student_keywords = [
+            "studium", "studiere", "studentin", "student ",
+            "uni", "universität", "hochschule", "fh ",
+            "bachelor", "master", "semester", "klausur", "prüfung",
+            "seminar", "vorlesung", "bafög", "immatrikul",
+            "wg-zimmer", "campus", "dozent", "kommiliton",
+            "abschlussarbeit", "hausarbeit",
+        ]
+        text_lower = text.lower()
+        return any(keyword in text_lower for keyword in student_keywords)
+
+    def run(self, table_name="forum_posts", require_student_context=False):
+        """
+        Verarbeitet eine einzelne Quelltabelle.
+
+        Input:  <table_name> mit status=0
         Output: status=1, status=3 oder status=-1
         """
-        print("[Agent 2] Starte Cleaning, Anonymisierung und Routing...")
+        print(f"[Agent 2] Starte Cleaning für Tabelle '{table_name}'...")
 
         conn = sqlite3.connect(self.db_file)
         cursor = conn.cursor()
 
-        cursor.execute("SELECT id, raw_content FROM forum_posts WHERE status = ?", (STATUS_RAW,))
+        cursor.execute(f"SELECT id, raw_content FROM {table_name} WHERE status = ?", (STATUS_RAW,))
         records = cursor.fetchall()
 
         if not records:
-            print("[Agent 2 INFO] Keine neuen Rohdaten mit status=0 gefunden.")
+            print(f"[Agent 2 INFO] Keine neuen Rohdaten mit status=0 in '{table_name}' gefunden.")
             conn.close()
             return
 
@@ -152,6 +208,7 @@ class Agent2Cleaner:
         human_review_count = 0
         rejected_count = 0
         empty_count = 0
+        no_context_count = 0
 
         for db_id, raw_text in records:
             cleaned = self._clean_text(raw_text)
@@ -160,7 +217,7 @@ class Agent2Cleaner:
 
             if not anonymized:
                 cursor.execute(
-                    "UPDATE forum_posts SET cleaned_content = ?, status = ? WHERE id = ?",
+                    f"UPDATE {table_name} SET cleaned_content = ?, status = ? WHERE id = ?",
                     ("", STATUS_REJECTED, db_id),
                 )
                 rejected_count += 1
@@ -169,7 +226,7 @@ class Agent2Cleaner:
 
             if self._is_critical_case(anonymized):
                 cursor.execute(
-                    "UPDATE forum_posts SET cleaned_content = ?, status = ? WHERE id = ?",
+                    f"UPDATE {table_name} SET cleaned_content = ?, status = ? WHERE id = ?",
                     (anonymized, STATUS_HUMAN_REVIEW, db_id),
                 )
                 human_review_count += 1
@@ -177,14 +234,24 @@ class Agent2Cleaner:
 
             if self._is_irrelevant_post(anonymized):
                 cursor.execute(
-                    "UPDATE forum_posts SET cleaned_content = ?, status = ? WHERE id = ?",
+                    f"UPDATE {table_name} SET cleaned_content = ?, status = ? WHERE id = ?",
                     (anonymized, STATUS_REJECTED, db_id),
                 )
                 rejected_count += 1
                 continue
 
+            # Zusätzlicher Check nur für breite, nicht-studienspezifische Quellen
+            if require_student_context and not self._has_student_context(anonymized):
+                cursor.execute(
+                    f"UPDATE {table_name} SET cleaned_content = ?, status = ? WHERE id = ?",
+                    (anonymized, STATUS_REJECTED, db_id),
+                )
+                rejected_count += 1
+                no_context_count += 1
+                continue
+
             cursor.execute(
-                "UPDATE forum_posts SET cleaned_content = ?, status = ? WHERE id = ?",
+                f"UPDATE {table_name} SET cleaned_content = ?, status = ? WHERE id = ?",
                 (anonymized, STATUS_CLEANED, db_id),
             )
             cleaned_count += 1
@@ -192,15 +259,29 @@ class Agent2Cleaner:
         conn.commit()
         conn.close()
 
-        print("\n========== Agent 2 Report ==========")
+        print(f"\n========== Agent 2 Report ({table_name}) ==========")
         print(f"Gesamt verarbeitet: {len(records)}")
         print(f"✓ Bereinigt & freigegeben (Status 1): {cleaned_count}")
         print(f"⚠ Human Review erforderlich (Status 3): {human_review_count}")
         print(f"✗ Irrelevant verworfen (Status -1): {rejected_count}")
-        print(f"∅ Leer / unlesbar (Status -1): {empty_count}")
-        print("====================================")
+        print(f"  ∅ davon leer/unlesbar: {empty_count}")
+        if require_student_context:
+            print(f"  ∅ davon ohne Studienbezug: {no_context_count}")
+        print("====================================================")
+
+    def run_all(self):
+        """
+        Verarbeitet nacheinander alle konfigurierten Quelltabellen
+        (SOURCE_TABLES). Praktisch, um nach einem Scraping-Lauf über
+        mehrere Quellen hinweg einmal alles durchzucleanen.
+        """
+        for table_name, config in self.SOURCE_TABLES.items():
+            self.run(
+                table_name=table_name,
+                require_student_context=config["require_student_context"],
+            )
 
 
 if __name__ == "__main__":
     cleaner = Agent2Cleaner()
-    cleaner.run()
+    cleaner.run(table_name="hilferuf_posts", require_student_context=True)
