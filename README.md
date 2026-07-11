@@ -15,3 +15,9 @@ should change.
 
 Do not commit `.env` or API keys. If the deployed app later needs credentials,
 add them through Streamlit Community Cloud's **Advanced settings > Secrets**.
+
+Activate VENV
+source .venv/bin/activate
+
+Activate Streamlit
+python -m streamlit run dashboard.py

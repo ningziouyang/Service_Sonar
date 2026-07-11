@@ -6,7 +6,7 @@
 import sqlite3
 
 # 1. Importiere unsere gekapselten Agenten-Klassen
-from agent1_scraper import Agent1Scraper
+from agent1_scraper_studis_online import Agent1Scraper
 from agent2_cleaner import Agent2Cleaner
 from agent3_analyzer import Agent3Analyzer
 from agent4_innovator import Agent4Innovator
