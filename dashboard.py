@@ -1656,50 +1656,6 @@ def load_data():
         return [], []
 
 
-
-def get_latest_trend_snapshot():
-    """
-    Lädt den neuesten Trend-Snapshot aus der SQLite-Datenbank.
-    Falls die Tabelle noch nicht existiert, wird None zurückgegeben.
-    """
-    conn = sqlite3.connect(DB_FILE)
-    cursor = conn.cursor()
-
-    try:
-        cursor.execute("""
-            SELECT created_at, snapshot_json, comparison_json
-            FROM trend_snapshots
-            ORDER BY id DESC
-            LIMIT 1
-        """)
-        row = cursor.fetchone()
-    except sqlite3.OperationalError:
-        conn.close()
-        return None
-
-    conn.close()
-
-    if not row:
-        return None
-
-    created_at, snapshot_json, comparison_json = row
-
-    try:
-        snapshot = json.loads(snapshot_json or "{}")
-    except json.JSONDecodeError:
-        snapshot = {}
-
-    try:
-        comparison = json.loads(comparison_json or "{}")
-    except json.JSONDecodeError:
-        comparison = {}
-
-    return {
-        "created_at": created_at,
-        "snapshot": snapshot,
-        "comparison": comparison,
-    }
-
 def build_analytics(records):
     analyses = []
     for row in records:
@@ -2488,7 +2444,7 @@ def render_stakeholders(stakeholder_counts, reports):
         st.session_state.stakeholder_detail_cache = detail_cache
         st.session_state.stakeholder_detail_cache_key = detail_cache_key
 
-    with st.container(key="stakeholder_dashboard_shell"):
+    with st.container():
         render_html(
             """
 <section class="stakeholder-section" id="stakeholder">
@@ -2525,10 +2481,7 @@ def render_stakeholders(stakeholder_counts, reports):
                 normalized_name = normalize_stakeholder_name(name)
 
                 with column:
-                    with st.container(
-                        key=f"stakeholder_card_wrap_{normalized_name}"
-                    ):
-
+                    with st.container():
                         render_html(
                             f"""
 <div class="sh-ov-card{active_class}">
@@ -2618,7 +2571,7 @@ def render_stakeholders(stakeholder_counts, reports):
         ]
 
         if service_gaps:
-            with st.container(key="service_gap_actions"):
+            with st.container():
                 render_html(
                     '<div class="sh-detail-label" style="margin-top:18px;">'
                     'Mögliche Service Innovation'
@@ -2681,7 +2634,7 @@ def render_innovation_new(reports, groups):
 """
     )
 
-    with st.container(key="innovation_form"):
+    with st.container():
         st.markdown(
             '<div class="ai-box-label">Lücke oder Signal eingeben:</div>',
             unsafe_allow_html=True,
@@ -2769,7 +2722,7 @@ def render_innovation_new(reports, groups):
         )
 
         if existing_result:
-            with st.container(key="reopen_signal_idea"):
+            with st.container():
                 if st.button(
                     "↗ Letzte Serviceidee erneut öffnen",
                     key="reopen_generated_signal_innovation",
@@ -2970,72 +2923,6 @@ def render_status_lab(records, analyses, status_counts):
 """
             )
 
-
-def render_trend_panel(trend_data):
-    """
-    Zeigt Veränderungen zwischen zwei Trend-Snapshots im Dashboard an.
-    """
-    render_html(
-        """
-        <section class="section" id="trend-monitoring">
-          <div class="sec-wrap">
-            <div class="sec-label">Trend Monitoring</div>
-            <h2 class="sec-title">Trend-Erkennung seit letztem Refresh</h2>
-            <p class="sec-body">
-              Dieser Bereich zeigt, ob sich seit dem letzten gespeicherten Snapshot
-              relevante Veränderungen in der Datenbasis ergeben haben.
-            </p>
-          </div>
-        </section>
-        """
-    )
-
-    if not trend_data:
-        st.info("Noch keine Trend-Snapshots vorhanden. Führe zuerst `python trend_tracker.py` aus.")
-        return
-
-    comparison = trend_data.get("comparison", {})
-
-    if not comparison.get("available"):
-        st.info("Der erste Snapshot wurde als Baseline gespeichert. Ein Vergleich ist ab dem nächsten Lauf möglich.")
-        return
-
-    col1, col2, col3 = st.columns(3)
-
-    col1.metric(
-        "Neue analysierte Beiträge",
-        comparison.get("analyzed_posts_change", 0)
-    )
-
-    col2.metric(
-        "Human Review",
-        comparison.get("human_review_change", 0)
-    )
-
-    col3.metric(
-        "Gesamtveränderung",
-        comparison.get("total_posts_change", 0)
-    )
-
-    highlights = comparison.get("highlights", [])
-
-    if highlights:
-        st.markdown("**Auffälligkeiten:**")
-        for item in highlights:
-            st.write(f"- {item}")
-
-    cluster_delta = comparison.get("cluster_delta", {})
-
-    if cluster_delta:
-        st.markdown("**Cluster-Veränderungen:**")
-        st.json(cluster_delta)
-
-    urgency_delta = comparison.get("urgency_delta", {})
-
-    if urgency_delta:
-        st.markdown("**Dringlichkeits-Veränderungen:**")
-        st.json(urgency_delta)
-
 def render_footer():
     render_html(
         """
@@ -3065,10 +2952,6 @@ def main():
     render_pipeline(status_counts)
     health = get_pipeline_health(reports)
     render_pipeline_health(health)
-
-    trend_data = get_latest_trend_snapshot()
-    render_trend_panel(trend_data)
-
     render_problem_dashboard(groups, len(analyses))
     render_cluster_section(groups, len(analyses))
     render_stakeholders(stakeholder_counts, reports)
