@@ -62,12 +62,17 @@ def sync_streamlit_secrets_to_env():
 
         return None
 
-    try:
-        secrets = st.secrets
-    except Exception:
-        secrets = None
+    local_secret_paths = [
+        Path.home() / ".streamlit" / "secrets.toml",
+        Path(__file__).with_name(".streamlit") / "secrets.toml",
+    ]
 
-    if not secrets:
+    if not any(path.exists() for path in local_secret_paths):
+        return
+
+    try:
+        secrets = dict(st.secrets)
+    except Exception:
         return
 
     for env_key, (section_name, short_name) in secret_specs.items():
@@ -114,7 +119,10 @@ def sync_streamlit_secrets_to_env():
             os.environ[env_key] = str(value)
 
 
-sync_streamlit_secrets_to_env()
+try:
+    sync_streamlit_secrets_to_env()
+except Exception:
+    pass
 
 
 STATUS_META = {
@@ -1648,6 +1656,50 @@ def load_data():
         return [], []
 
 
+
+def get_latest_trend_snapshot():
+    """
+    Lädt den neuesten Trend-Snapshot aus der SQLite-Datenbank.
+    Falls die Tabelle noch nicht existiert, wird None zurückgegeben.
+    """
+    conn = sqlite3.connect(DB_FILE)
+    cursor = conn.cursor()
+
+    try:
+        cursor.execute("""
+            SELECT created_at, snapshot_json, comparison_json
+            FROM trend_snapshots
+            ORDER BY id DESC
+            LIMIT 1
+        """)
+        row = cursor.fetchone()
+    except sqlite3.OperationalError:
+        conn.close()
+        return None
+
+    conn.close()
+
+    if not row:
+        return None
+
+    created_at, snapshot_json, comparison_json = row
+
+    try:
+        snapshot = json.loads(snapshot_json or "{}")
+    except json.JSONDecodeError:
+        snapshot = {}
+
+    try:
+        comparison = json.loads(comparison_json or "{}")
+    except json.JSONDecodeError:
+        comparison = {}
+
+    return {
+        "created_at": created_at,
+        "snapshot": snapshot,
+        "comparison": comparison,
+    }
+
 def build_analytics(records):
     analyses = []
     for row in records:
@@ -2918,6 +2970,72 @@ def render_status_lab(records, analyses, status_counts):
 """
             )
 
+
+def render_trend_panel(trend_data):
+    """
+    Zeigt Veränderungen zwischen zwei Trend-Snapshots im Dashboard an.
+    """
+    render_html(
+        """
+        <section class="section" id="trend-monitoring">
+          <div class="sec-wrap">
+            <div class="sec-label">Trend Monitoring</div>
+            <h2 class="sec-title">Trend-Erkennung seit letztem Refresh</h2>
+            <p class="sec-body">
+              Dieser Bereich zeigt, ob sich seit dem letzten gespeicherten Snapshot
+              relevante Veränderungen in der Datenbasis ergeben haben.
+            </p>
+          </div>
+        </section>
+        """
+    )
+
+    if not trend_data:
+        st.info("Noch keine Trend-Snapshots vorhanden. Führe zuerst `python trend_tracker.py` aus.")
+        return
+
+    comparison = trend_data.get("comparison", {})
+
+    if not comparison.get("available"):
+        st.info("Der erste Snapshot wurde als Baseline gespeichert. Ein Vergleich ist ab dem nächsten Lauf möglich.")
+        return
+
+    col1, col2, col3 = st.columns(3)
+
+    col1.metric(
+        "Neue analysierte Beiträge",
+        comparison.get("analyzed_posts_change", 0)
+    )
+
+    col2.metric(
+        "Human Review",
+        comparison.get("human_review_change", 0)
+    )
+
+    col3.metric(
+        "Gesamtveränderung",
+        comparison.get("total_posts_change", 0)
+    )
+
+    highlights = comparison.get("highlights", [])
+
+    if highlights:
+        st.markdown("**Auffälligkeiten:**")
+        for item in highlights:
+            st.write(f"- {item}")
+
+    cluster_delta = comparison.get("cluster_delta", {})
+
+    if cluster_delta:
+        st.markdown("**Cluster-Veränderungen:**")
+        st.json(cluster_delta)
+
+    urgency_delta = comparison.get("urgency_delta", {})
+
+    if urgency_delta:
+        st.markdown("**Dringlichkeits-Veränderungen:**")
+        st.json(urgency_delta)
+
 def render_footer():
     render_html(
         """
@@ -2947,6 +3065,10 @@ def main():
     render_pipeline(status_counts)
     health = get_pipeline_health(reports)
     render_pipeline_health(health)
+
+    trend_data = get_latest_trend_snapshot()
+    render_trend_panel(trend_data)
+
     render_problem_dashboard(groups, len(analyses))
     render_cluster_section(groups, len(analyses))
     render_stakeholders(stakeholder_counts, reports)
