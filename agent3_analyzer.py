@@ -19,6 +19,10 @@ if load_dotenv:
     load_dotenv()
 
 class Agent3Analyzer:
+    # Tabellen, die Agent 3 kennt. Neue Quellen (wie hilferuf_posts) einfach
+    # hier ergänzen, dann per --table ansprechbar.
+    KNOWN_TABLES = {"forum_posts", "hilferuf_posts"}
+
     def __init__(self, db_file="service_sonar.db"):
         self.db_file = db_file
 
@@ -74,20 +78,26 @@ class Agent3Analyzer:
             print(f"[Agent 3 ERROR] API-Aufruf fehlgeschlagen: {e}")
             return None
 
-    def run(self, limit=None, offset=0, sleep_seconds=0.0):
+    def run(self, table_name="forum_posts", limit=None, offset=0, sleep_seconds=0.0):
         """
         Agent 3 Interface: LLM-basierte semantische Analyse.
+        Verarbeitet eine einzelne Quelltabelle (forum_posts ODER hilferuf_posts).
         """
-        print(f"[Agent 3] Starte semantische Analyse über LLM ({self.model_name})...")
+        if table_name not in self.KNOWN_TABLES:
+            raise ValueError(
+                f"Unbekannte Tabelle '{table_name}'. Bekannt: {sorted(self.KNOWN_TABLES)}"
+            )
+
+        print(f"[Agent 3] Starte semantische Analyse über LLM ({self.model_name}) für Tabelle '{table_name}'...")
         if limit is not None:
             print(f"[Agent 3] Batch-Modus aktiv: limit={limit}, offset={offset}, sleep={sleep_seconds}s")
 
         conn = sqlite3.connect(self.db_file)
         cursor = conn.cursor()
 
-        query = """
+        query = f"""
             SELECT id, cleaned_content
-            FROM forum_posts
+            FROM {table_name}
             WHERE status = 1
             ORDER BY id ASC
         """
@@ -100,7 +110,7 @@ class Agent3Analyzer:
         records = cursor.fetchall()
 
         if not records:
-            print("[Agent 3 INFO] Keine bereinigten Beiträge mit status=1 gefunden.")
+            print(f"[Agent 3 INFO] Keine bereinigten Beiträge mit status=1 in '{table_name}' gefunden.")
             conn.close()
             return
 
@@ -111,19 +121,9 @@ class Agent3Analyzer:
             # 🚀 Hier rufen wir das echte KI-Modell auf!
             analysis_dict = self._call_llm_api(cleaned_content)
 
-            # Wenn der API-Aufruf fehlschlägt, darf der Beitrag nicht als erfolgreich analysiert gelten.
-            if "error" in analysis_dict:
-                error_json = json.dumps(analysis_dict, ensure_ascii=False, indent=2)
-
-                cursor.execute(
-                    """
-                    UPDATE forum_posts
-                    SET analysis_json = ?, status = 1
-                    WHERE id = ?
-                    """,
-                    (error_json, db_id)
-                )
-
+            # Wenn der API-Aufruf fehlschlägt (z.B. Rate-Limit erreicht),
+            # darf der Beitrag nicht als erfolgreich analysiert gelten.
+            if analysis_dict is None:
                 print(f"[Agent 3 ERROR] Analyse für ID {db_id} fehlgeschlagen -> bleibt status=1.")
                 continue
 
@@ -134,25 +134,28 @@ class Agent3Analyzer:
             analysis_json = json.dumps(analysis_dict, ensure_ascii=False, indent=2)
 
             cursor.execute(
-                """
-                UPDATE forum_posts
+                f"""
+                UPDATE {table_name}
                 SET analysis_json = ?, status = 2
                 WHERE id = ?
                 """,
                 (analysis_json, db_id)
             )
+            conn.commit()  # nach jedem Post committen, damit bei Abbruch nichts verloren geht
 
             print(f"[Agent 3] LLM-Analyse abgeschlossen für ID {db_id} -> status=2.")
 
             if sleep_seconds > 0:
                 time.sleep(sleep_seconds)
 
-        conn.commit()
         conn.close()
-        print("\n[Agent 3] Verarbeitung abgeschlossen.")
+        print(f"\n[Agent 3] Verarbeitung von '{table_name}' abgeschlossen.")
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Run Agent 3 semantic LLM analysis on cleaned forum posts.")
+    parser.add_argument("--table", type=str, default="forum_posts",
+                         help="Quelltabelle: forum_posts oder hilferuf_posts.")
     parser.add_argument("--limit", type=int, default=None, help="Maximum number of status=1 records to process.")
     parser.add_argument("--offset", type=int, default=0, help="Skip this many status=1 records before processing.")
     parser.add_argument("--sleep", type=float, default=0.0, help="Seconds to wait between LLM calls.")
@@ -166,4 +169,4 @@ if __name__ == "__main__":
         raise ValueError("--sleep must not be negative.")
 
     analyzer = Agent3Analyzer()
-    analyzer.run(limit=args.limit, offset=args.offset, sleep_seconds=args.sleep)
+    analyzer.run(table_name=args.table, limit=args.limit, offset=args.offset, sleep_seconds=args.sleep)
