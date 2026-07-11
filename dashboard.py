@@ -1464,8 +1464,11 @@ def load_data():
             dict(row)
             for row in conn.execute(
                 """
-                SELECT id, url, raw_content, cleaned_content, analysis_json, status
+                SELECT id, url, raw_content, cleaned_content, analysis_json, status, 'forum_posts' AS source_table
                 FROM forum_posts
+                UNION ALL
+                SELECT id, url, raw_content, cleaned_content, analysis_json, status, 'hilferuf_posts' AS source_table
+                FROM hilferuf_posts
                 ORDER BY id DESC
                 """
             ).fetchall()
