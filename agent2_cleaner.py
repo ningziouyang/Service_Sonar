@@ -1,6 +1,13 @@
 import re
 import sqlite3
+import sys
 from html import unescape
+
+
+try:
+    sys.stdout.reconfigure(encoding="utf-8")
+except (AttributeError, ValueError):
+    pass
 
 
 STATUS_REJECTED = -1
@@ -129,6 +136,41 @@ class Agent2Cleaner:
             return True
 
         return any(keyword in text_lower for keyword in irrelevant_keywords)
+
+    def _remove_forum_metadata(self, text: str) -> str:
+        """
+        Entfernt technische Quellen-Metadaten aus importierten Beiträgen.
+        Bewahrt Titel und Inhalt, damit Agent 3 weiterhin das eigentliche Signal sieht.
+        """
+        if not text:
+            return ""
+
+        title_match = re.search(
+            r"\bTitel:\s*(.+?)(?=\s+(?:URL|Erstellt|Score|Kommentare|Inhalt):|$)",
+            text,
+        )
+        body_match = re.search(r"\bInhalt:\s*(.+)$", text)
+
+        parts = []
+        if title_match:
+            parts.append(title_match.group(1).strip())
+        if body_match:
+            body = body_match.group(1).strip()
+            if body and not body.startswith("(Kein Fließtext vorhanden"):
+                parts.append(body)
+
+        if parts:
+            return " ".join(parts).strip()
+
+        cleaned = re.sub(
+            r"\b(?:Quelle|Kategorie|URL|Erstellt|Score|Kommentare):\s*"
+            r".+?(?=\s+(?:Quelle|Kategorie|Titel|URL|Erstellt|Score|Kommentare|Inhalt):|$)",
+            " ",
+            text,
+        )
+        cleaned = re.sub(r"\bInhalt:\s*", " ", cleaned)
+        cleaned = re.sub(r"\s+", " ", cleaned).strip()
+        return cleaned
 
     def run(self):
         """

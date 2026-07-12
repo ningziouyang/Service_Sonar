@@ -259,6 +259,17 @@ class TrendTracker:
         if not comparison.get("available"):
             return highlights
 
+        if comparison["total_posts_change"] > 0:
+            highlights.append(
+                f"{comparison['total_posts_change']} neue Beiträge seit dem letzten Snapshot."
+            )
+
+        cleaned_delta = comparison.get("status_delta", {}).get("1")
+        if cleaned_delta and cleaned_delta["change"] > 0:
+            highlights.append(
+                f"{cleaned_delta['change']} neue bereinigte Beiträge warten auf Agent-3-Analyse."
+            )
+
         if comparison["analyzed_posts_change"] > 0:
             highlights.append(
                 f"{comparison['analyzed_posts_change']} neue analysierte Beiträge seit dem letzten Snapshot."

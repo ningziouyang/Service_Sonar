@@ -48,11 +48,45 @@ class Agent1Scraper:
         db_file=DB_FILE,
         forum_sections=None,
         pages_per_section=None,
+        max_sections=None,
+        max_new_posts_per_section=None,
+        stop_on_challenge=None,
     ):
         self.db_file = db_file
         self.headers = HEADERS
-        self.forum_sections = dict(forum_sections or STUDIS_ONLINE_FORUM_SECTIONS)
+        self.forum_sections = self._load_forum_sections(
+            forum_sections or STUDIS_ONLINE_FORUM_SECTIONS,
+            max_sections=max_sections,
+        )
         self.pages_per_section = self._load_pages_per_section(pages_per_section)
+        self.max_new_posts_per_section = self._load_optional_int(
+            "AGENT1_MAX_NEW_POSTS_PER_SECTION",
+            max_new_posts_per_section,
+            default=8,
+        )
+        self.stop_on_challenge = self._load_bool(
+            "AGENT1_STOP_ON_CHALLENGE",
+            stop_on_challenge,
+            default=True,
+        )
+        self.detail_sleep_range = self._load_sleep_range(
+            "AGENT1_DETAIL_SLEEP_MIN",
+            "AGENT1_DETAIL_SLEEP_MAX",
+            default_min=1.5,
+            default_max=3.5,
+        )
+        self.page_sleep_range = self._load_sleep_range(
+            "AGENT1_PAGE_SLEEP_MIN",
+            "AGENT1_PAGE_SLEEP_MAX",
+            default_min=6.0,
+            default_max=12.0,
+        )
+        self.board_sleep_range = self._load_sleep_range(
+            "AGENT1_BOARD_SLEEP_MIN",
+            "AGENT1_BOARD_SLEEP_MAX",
+            default_min=20.0,
+            default_max=45.0,
+        )
         self._initialisiere_datenbank()
 
     def _load_pages_per_section(self, pages_per_section):
@@ -65,6 +99,80 @@ class Agent1Scraper:
             pages = 5
 
         return max(1, pages)
+
+    def _load_forum_sections(self, forum_sections, max_sections=None):
+        sections = dict(forum_sections)
+        only_sections = os.getenv("AGENT1_ONLY_SECTIONS", "").strip()
+
+        if only_sections:
+            wanted = [
+                section.strip().lower()
+                for section in only_sections.split(",")
+                if section.strip()
+            ]
+            sections = {
+                name: url
+                for name, url in sections.items()
+                if any(want in name.lower() for want in wanted)
+            }
+
+        max_sections = self._load_optional_int(
+            "AGENT1_MAX_SECTIONS",
+            max_sections,
+            default=0,
+        )
+        if max_sections > 0:
+            sections = dict(list(sections.items())[:max_sections])
+
+        return sections
+
+    def _load_optional_int(self, env_name, explicit_value, default):
+        value = explicit_value
+        if value is None:
+            value = os.getenv(env_name, str(default))
+
+        try:
+            loaded = int(value)
+        except (TypeError, ValueError):
+            loaded = default
+
+        return max(0, loaded)
+
+    def _load_bool(self, env_name, explicit_value, default):
+        if explicit_value is not None:
+            return bool(explicit_value)
+
+        value = os.getenv(env_name)
+        if value is None:
+            return default
+
+        return value.strip().lower() in {"1", "true", "yes", "y", "on"}
+
+    def _load_sleep_range(self, min_env_name, max_env_name, default_min, default_max):
+        min_seconds = self._load_float(min_env_name, default_min)
+        max_seconds = self._load_float(max_env_name, default_max)
+
+        min_seconds = max(0.0, min_seconds)
+        max_seconds = max(0.0, max_seconds)
+        if max_seconds < min_seconds:
+            min_seconds, max_seconds = max_seconds, min_seconds
+
+        return min_seconds, max_seconds
+
+    def _load_float(self, env_name, default):
+        try:
+            return float(os.getenv(env_name, str(default)))
+        except (TypeError, ValueError):
+            return default
+
+    def _sleep_random(self, seconds_range, reason):
+        min_seconds, max_seconds = seconds_range
+        if max_seconds <= 0:
+            return
+
+        seconds = random.uniform(min_seconds, max_seconds)
+        print(f"  Warte {seconds:.1f}s ({reason})...")
+        time.sleep(seconds)
 
     def _safe_get(self, url, timeout=20, retries=3):
         """
@@ -157,18 +265,28 @@ class Agent1Scraper:
         print("[Agent 1] Starte Deep-Scraper Prozess...")
         print(
             f"[Agent 1] Konfigurierte Studis-Online-Boards: "
-            f"{len(self.forum_sections)}; Seiten je Board: {self.pages_per_section}"
+            f"{len(self.forum_sections)}; Seiten je Board: {self.pages_per_section}; "
+            f"neue Detailseiten je Board: {self.max_new_posts_per_section or 'unbegrenzt'}"
         )
+        if self.stop_on_challenge:
+            print("[Agent 1] Sicherheitsprüfung erkannt -> kompletter Lauf stoppt.")
+
+        if not self.forum_sections:
+            print("[Agent 1] Keine passenden Boards konfiguriert. Prüfe AGENT1_ONLY_SECTIONS.")
+            return 0
 
         conn = sqlite3.connect(self.db_file)
         cursor = conn.cursor()
         erfolgreich_gespeichert = 0
         bereits_vorhanden = 0
+        stop_requested = False
 
-        for kategorie, base_url in self.forum_sections.items():
+        for board_index, (kategorie, base_url) in enumerate(self.forum_sections.items(), start=1):
             print("\n==================================================")
             print(f"Starte Deep-Scraping: {kategorie}")
             print("==================================================")
+            neue_details_in_board = 0
+            challenge_detected = False
 
             for seite in range(1, self.pages_per_section + 1):
                 url = self._page_url(base_url, seite)
@@ -185,9 +303,10 @@ class Agent1Scraper:
                 if self._is_security_challenge(antwort):
                     print(
                         "  Studis Online liefert gerade eine Sicherheitsprüfung "
-                        "statt der Forenliste. Agent 1 stoppt dieses Board, "
-                        "damit keine leeren Ergebnisse falsch interpretiert werden."
+                        "statt der Forenliste."
                     )
+                    challenge_detected = True
+                    stop_requested = self.stop_on_challenge
                     break
 
                 soup = BeautifulSoup(antwort.text, "html.parser")
@@ -215,10 +334,29 @@ class Agent1Scraper:
                         bereits_vorhanden += 1
                         continue
 
+                    if (
+                        self.max_new_posts_per_section
+                        and neue_details_in_board >= self.max_new_posts_per_section
+                    ):
+                        print(
+                            "      Limit für neue Detailseiten in diesem Board erreicht. "
+                            "Weiter mit dem nächsten Board."
+                        )
+                        break
+
                     detail_resp = self._safe_get(post_url, timeout=20, retries=2)
                     if detail_resp is None:
                         print("      Detailseite konnte nicht geladen werden. Überspringe Beitrag.")
                         continue
+
+                    if self._is_security_challenge(detail_resp):
+                        print(
+                            "      Studis Online liefert bei der Detailseite eine "
+                            "Sicherheitsprüfung statt des Beitrags."
+                        )
+                        challenge_detected = True
+                        stop_requested = self.stop_on_challenge
+                        break
 
                     post_body = self._extract_post_body(detail_resp.text)
                     full_text = self._build_raw_content(kategorie, post_title, post_body)
@@ -233,11 +371,32 @@ class Agent1Scraper:
                     if cursor.rowcount > 0:
                         print(f"      Gespeichert: {post_title[:45]}...")
                         erfolgreich_gespeichert += 1
+                    neue_details_in_board += 1
 
-                    time.sleep(random.uniform(0.5, 1.5))
+                    if not (
+                        self.max_new_posts_per_section
+                        and neue_details_in_board >= self.max_new_posts_per_section
+                    ):
+                        self._sleep_random(self.detail_sleep_range, "Detailseiten schonen")
 
                 conn.commit()
-                time.sleep(random.uniform(2.0, 4.0))
+                if challenge_detected or (
+                    self.max_new_posts_per_section
+                    and neue_details_in_board >= self.max_new_posts_per_section
+                ):
+                    break
+                if seite < self.pages_per_section:
+                    self._sleep_random(self.page_sleep_range, "nächste Übersichtsseite")
+
+            if stop_requested:
+                print(
+                    "[Agent 1] Sicherheitsprüfung erkannt. Lauf wird beendet, "
+                    "damit keine weiteren Requests ausgelöst werden."
+                )
+                break
+
+            if board_index < len(self.forum_sections):
+                self._sleep_random(self.board_sleep_range, "nächstes Board")
 
         conn.close()
         print(
