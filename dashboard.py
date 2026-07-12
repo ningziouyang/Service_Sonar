@@ -1289,7 +1289,7 @@ def render_trend_panel(trend_data):
 
     snapshot = trend_data.get("snapshot", {})
     comparison = trend_data.get("comparison", {})
-    created_at = trend_data.get("created_at") or snapshot.get("created_at") or "N/A"
+    created_at = snapshot.get("created_at") or trend_data.get("created_at") or "N/A"
 
     if not comparison.get("available"):
         st.info(

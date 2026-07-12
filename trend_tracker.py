@@ -2,6 +2,7 @@ import argparse
 import json
 import sqlite3
 import sys
+from collections import Counter
 from datetime import datetime
 
 
@@ -9,6 +10,9 @@ try:
     sys.stdout.reconfigure(encoding="utf-8")
 except (AttributeError, ValueError):
     pass
+
+
+POST_TABLE_CANDIDATES = ("forum_posts", "hilferuf_posts", "gutefrage_posts")
 
 
 class TrendTracker:
@@ -40,37 +44,40 @@ class TrendTracker:
             """
         )
 
-    def _count_by_status(self, cursor):
+    def _post_tables(self, cursor):
+        existing = {
+            row[0]
+            for row in cursor.execute(
+                "SELECT name FROM sqlite_master WHERE type = 'table'"
+            )
+        }
+        return [table for table in POST_TABLE_CANDIDATES if table in existing]
+
+    def _analysis_rows(self, cursor, post_tables):
+        for table in post_tables:
+            cursor.execute(
+                f"SELECT analysis_json FROM {table} "
+                "WHERE status = 2 AND analysis_json IS NOT NULL"
+            )
+            yield from cursor.fetchall()
+
+    def _count_by_status(self, cursor, post_tables):
         """
         Zählt Beiträge nach Pipeline-Status.
         """
-        cursor.execute(
-            """
-            SELECT status, COUNT(*)
-            FROM forum_posts
-            GROUP BY status
-            ORDER BY status
-            """
-        )
+        counts = Counter()
+        for table in post_tables:
+            cursor.execute(f"SELECT status, COUNT(*) FROM {table} GROUP BY status")
+            counts.update({str(status): count for status, count in cursor.fetchall()})
+        return dict(sorted(counts.items(), key=lambda item: int(item[0])))
 
-        return {str(status): count for status, count in cursor.fetchall()}
-
-    def _count_by_cluster(self, cursor):
+    def _count_by_cluster(self, cursor, post_tables):
         """
         Zählt analysierte Beiträge nach problem_cluster aus analysis_json.
         """
-        cursor.execute(
-            """
-            SELECT analysis_json
-            FROM forum_posts
-            WHERE status = 2
-              AND analysis_json IS NOT NULL
-            """
-        )
-
         cluster_counts = {}
 
-        for (raw_json,) in cursor.fetchall():
+        for (raw_json,) in self._analysis_rows(cursor, post_tables):
             data = self._safe_json_loads(raw_json)
             cluster = data.get("problem_cluster", "Unbekannt")
 
@@ -81,22 +88,13 @@ class TrendTracker:
 
         return dict(sorted(cluster_counts.items(), key=lambda item: item[1], reverse=True))
 
-    def _count_by_urgency(self, cursor):
+    def _count_by_urgency(self, cursor, post_tables):
         """
         Zählt analysierte Beiträge nach Dringlichkeit.
         """
-        cursor.execute(
-            """
-            SELECT analysis_json
-            FROM forum_posts
-            WHERE status = 2
-              AND analysis_json IS NOT NULL
-            """
-        )
-
         urgency_counts = {}
 
-        for (raw_json,) in cursor.fetchall():
+        for (raw_json,) in self._analysis_rows(cursor, post_tables):
             data = self._safe_json_loads(raw_json)
             urgency = data.get("urgency", "Unbekannt")
 
@@ -107,22 +105,13 @@ class TrendTracker:
 
         return dict(sorted(urgency_counts.items(), key=lambda item: item[1], reverse=True))
 
-    def _count_by_stakeholder(self, cursor):
+    def _count_by_stakeholder(self, cursor, post_tables):
         """
         Zählt, wie oft Stakeholder in analysierten Beiträgen genannt werden.
         """
-        cursor.execute(
-            """
-            SELECT analysis_json
-            FROM forum_posts
-            WHERE status = 2
-              AND analysis_json IS NOT NULL
-            """
-        )
-
         stakeholder_counts = {}
 
-        for (raw_json,) in cursor.fetchall():
+        for (raw_json,) in self._analysis_rows(cursor, post_tables):
             data = self._safe_json_loads(raw_json)
             stakeholders = data.get("stakeholders", [])
 
@@ -216,10 +205,21 @@ class TrendTracker:
 
         previous = previous_snapshot["snapshot"]
 
+        if previous.get("source_tables") != current_snapshot.get("source_tables"):
+            return {
+                "available": False,
+                "message": (
+                    "Die Datenquellen haben sich geändert. Dieser Lauf erstellt "
+                    "eine neue vergleichbare Baseline."
+                ),
+            }
+
         comparison = {
             "available": True,
             "previous_snapshot_id": previous_snapshot["id"],
-            "previous_created_at": previous_snapshot["created_at"],
+            "previous_created_at": (
+                previous.get("created_at") or previous_snapshot["created_at"]
+            ),
             "total_posts_change": (
                 current_snapshot["total_posts"] - previous.get("total_posts", 0)
             ),
@@ -304,25 +304,22 @@ class TrendTracker:
         conn = self._connect()
         cursor = conn.cursor()
         self._init_table(cursor)
-
-        cursor.execute("SELECT COUNT(*) FROM forum_posts")
-        total_posts = cursor.fetchone()[0]
-
-        cursor.execute("SELECT COUNT(*) FROM forum_posts WHERE status = 2")
-        analyzed_posts = cursor.fetchone()[0]
-
-        cursor.execute("SELECT COUNT(*) FROM forum_posts WHERE status = 3")
-        human_review_posts = cursor.fetchone()[0]
+        post_tables = self._post_tables(cursor)
+        status_counts = self._count_by_status(cursor, post_tables)
+        total_posts = sum(status_counts.values())
+        analyzed_posts = status_counts.get("2", 0)
+        human_review_posts = status_counts.get("3", 0)
 
         snapshot = {
-            "created_at": datetime.now().isoformat(timespec="seconds"),
+            "created_at": datetime.now().astimezone().isoformat(timespec="seconds"),
+            "source_tables": post_tables,
             "total_posts": total_posts,
             "analyzed_posts": analyzed_posts,
             "human_review_posts": human_review_posts,
-            "status_counts": self._count_by_status(cursor),
-            "cluster_counts": self._count_by_cluster(cursor),
-            "urgency_counts": self._count_by_urgency(cursor),
-            "stakeholder_counts": self._count_by_stakeholder(cursor),
+            "status_counts": status_counts,
+            "cluster_counts": self._count_by_cluster(cursor, post_tables),
+            "urgency_counts": self._count_by_urgency(cursor, post_tables),
+            "stakeholder_counts": self._count_by_stakeholder(cursor, post_tables),
         }
 
         previous_snapshot = self._load_previous_snapshot(cursor)
