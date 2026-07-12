@@ -86,3 +86,36 @@ def get_feedback_map(db_file: str = DB_FILE) -> dict:
         r[0]: {"title": r[1], "decision": r[2], "note": r[3], "updated_at": r[4]}
         for r in rows
     }
+
+FEEDBACK_MIN_SIGNALS = 5  # stay silent until this many decisions exist
+
+def summarize_feedback_for_prompt(db_file: str = DB_FILE) -> str:
+    """
+    Returns a short German nudge describing which kinds of ideas stakeholders
+    took up vs. rejected. Returns "" until there is enough feedback, so it
+    cannot bias generation on thin data.
+    """
+    fb = get_feedback_map(db_file)
+    if len(fb) < FEEDBACK_MIN_SIGNALS:
+        return ""
+
+    liked, rejected = [], []
+    for entry in fb.values():
+        decision = entry.get("decision")
+        title = entry.get("title") or ""
+        if decision == "Aufgegriffen":
+            liked.append(title)
+        elif decision in ("Nicht zuständig", "Andere Lösung nötig"):
+            rejected.append(title)
+
+    if not liked and not rejected:
+        return ""
+
+    parts = []
+    if liked:
+        parts.append("Von Stakeholdern aufgegriffen (mehr in dieser Richtung): "
+                     + "; ".join(liked[:8]))
+    if rejected:
+        parts.append("Von Stakeholdern abgelehnt (anderen Ansatz waehlen): "
+                     + "; ".join(rejected[:8]))
+    return "\n".join(parts)

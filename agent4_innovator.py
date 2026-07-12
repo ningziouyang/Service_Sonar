@@ -382,6 +382,21 @@ Diversity constraints:
             f"{json.dumps(evidence_bundle, ensure_ascii=False, indent=2)}"
         )
 
+        # Cumulative DSR feedback: nudge generation with past stakeholder decisions.
+        # Returns "" until enough feedback exists, so this is inert on thin data.
+        try:
+            from feedback_store import summarize_feedback_for_prompt
+            feedback_hint = summarize_feedback_for_prompt(self.db_file)
+        except Exception:
+            feedback_hint = ""
+
+        if feedback_hint:
+            user_prompt += (
+                "\n\nBisheriges Stakeholder-Feedback zu frueheren Serviceideen. "
+                "Nutze es als sanften Hinweis, nicht als strikte Regel:\n"
+                f"{feedback_hint}"
+            )
+
         return [
             {"role": "system", "content": system_prompt.strip()},
             {"role": "user", "content": user_prompt},
