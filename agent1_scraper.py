@@ -22,7 +22,9 @@ HEADERS = {
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
         "AppleWebKit/537.36 (KHTML, like Gecko) "
         "Chrome/120.0.0.0 Safari/537.36"
-    )
+    ),
+    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+    "Accept-Language": "de-DE,de;q=0.9,en-US;q=0.8,en;q=0.7",
 }
 
 STUDIS_ONLINE_FORUM_SECTIONS = {
@@ -111,6 +113,14 @@ class Agent1Scraper:
     def _normalisiere_post_url(self, href):
         return urljoin("https://www.studis-online.de", href or "")
 
+    def _is_security_challenge(self, response):
+        text = response.text if response is not None else ""
+        return (
+            "challenge.php" in getattr(response, "url", "")
+            or "Sicherheitsüberprüfung" in text
+            or "Sicherheitsprüfung" in text
+        )
+
     def _post_exists(self, cursor, post_url):
         cursor.execute("SELECT 1 FROM forum_posts WHERE url = ? LIMIT 1", (post_url,))
         return cursor.fetchone() is not None
@@ -171,6 +181,14 @@ class Agent1Scraper:
                         "Überspringe Seite."
                     )
                     continue
+
+                if self._is_security_challenge(antwort):
+                    print(
+                        "  Studis Online liefert gerade eine Sicherheitsprüfung "
+                        "statt der Forenliste. Agent 1 stoppt dieses Board, "
+                        "damit keine leeren Ergebnisse falsch interpretiert werden."
+                    )
+                    break
 
                 soup = BeautifulSoup(antwort.text, "html.parser")
                 links = soup.select('a.ston-farblinkh[href*="read.php"]')
