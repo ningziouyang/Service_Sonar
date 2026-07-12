@@ -1,7 +1,14 @@
 import argparse
 import json
 import sqlite3
+import sys
 from datetime import datetime
+
+
+try:
+    sys.stdout.reconfigure(encoding="utf-8")
+except (AttributeError, ValueError):
+    pass
 
 
 class TrendTracker:
