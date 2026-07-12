@@ -1545,6 +1545,70 @@ def show_service_innovation_dialog(
 </div>
 """
     )
+  
+  # === DSR Stakeholder-Feedback ==========================================
+    from feedback_store import DECISIONS, make_key, set_feedback, get_feedback_map
+
+    fb_key = make_key(opportunity)
+    fb_current = get_feedback_map().get(fb_key, {})
+
+    st.divider()
+    st.markdown("**Stakeholder-Entscheidung zu dieser Idee**")
+
+    fb_decision = st.segmented_control(
+        "Entscheidung",
+        options=DECISIONS,
+        default=fb_current.get("decision"),
+        key=f"decision_{fb_key}",
+        label_visibility="collapsed",
+    )
+    fb_note = st.text_input(
+        "Notiz",
+        value=fb_current.get("note", ""),
+        key=f"note_{fb_key}",
+        placeholder="optionale Notiz…",
+        label_visibility="collapsed",
+    )
+    if st.button("Entscheidung speichern", key=f"save_{fb_key}"):
+        if fb_decision:
+            set_feedback(fb_key, opportunity, fb_decision, fb_note or "")
+            st.success(f"Gespeichert: {fb_decision}")
+        else:
+            st.warning("Bitte zuerst eine Entscheidung wählen.")
+    if fb_current.get("updated_at"):
+        st.caption(
+            f"Zuletzt: {fb_current.get('decision')} · {fb_current.get('updated_at')}"
+        )
+
+    # --- Phase 2 (reactive): idea missed -> Agent 4 proposes an alternative ---
+    if fb_decision == "Andere Lösung nötig":
+        st.info(
+            "Der Bedarf bleibt bestehen – Service Sonar kann eine alternative "
+            "Idee für dasselbe Problem vorschlagen."
+        )
+        if st.button("↻ Neue Lösung vorschlagen", key=f"regen_{fb_key}"):
+            try:
+                with st.spinner("Alternative Serviceidee wird entwickelt..."):
+                    from agent4_innovator import Agent4Innovator
+                    regen_prompt = (
+                        f"Die bisherige Idee '{opportunity}' fuer den Bedarf im "
+                        f"Cluster '{cluster}' wurde vom Stakeholder als unpassend "
+                        f"markiert. Schlage einen ANDEREN Loesungsansatz fuer "
+                        f"denselben Bedarf vor. Datengrundlage: {innovation_evidence}"
+                    )
+                    alt = Agent4Innovator().generate_from_signal(regen_prompt)
+                st.session_state[f"alt_{fb_key}"] = alt
+            except Exception as exc:
+                st.error(f"Alternative konnte nicht generiert werden: {exc}")
+
+    alt_idea = st.session_state.get(f"alt_{fb_key}")
+    if isinstance(alt_idea, dict):
+        st.markdown("**Alternativer Vorschlag von Agent 4:**")
+        st.markdown(f"**{alt_idea.get('opportunity', 'Neue Serviceidee')}**")
+        st.write(alt_idea.get("solution", ""))
+    # =======================================================================
+    
+
 
 def set_signal_suggestion(text: str) -> None:
     st.session_state.signal_input = text
@@ -2847,6 +2911,8 @@ def render_innovation(reports, groups):
 </section>
 """
     )
+
+    
 
 
 def render_status_lab(records, analyses, status_counts):
