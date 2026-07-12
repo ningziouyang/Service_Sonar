@@ -8,6 +8,7 @@ from pathlib import Path
 from textwrap import dedent
 import re
 from agent4_innovator import Agent4Innovator
+from migrate_database import ensure_feature_tables
 
 import streamlit as st
 
@@ -19,6 +20,18 @@ st.set_page_config(
 )
 
 DB_FILE = Path(__file__).with_name("service_sonar.db")
+
+
+def ensure_dashboard_schema() -> list[str]:
+    """Keep dashboard feature tables available after database replacements."""
+    if not DB_FILE.exists():
+        return []
+
+    connection = sqlite3.connect(DB_FILE)
+    try:
+        return ensure_feature_tables(connection)
+    finally:
+        connection.close()
 
 
 def sync_streamlit_secrets_to_env():
@@ -3279,6 +3292,12 @@ def render_footer():
 
 
 def main():
+    try:
+        ensure_dashboard_schema()
+    except sqlite3.Error as exc:
+        st.error(f"Die Datenbankstruktur konnte nicht aktualisiert werden: {exc}")
+        st.stop()
+
     render_html(CUSTOM_CSS)
     records, reports = load_data()
     status_counts = Counter(status_as_int(row.get("status")) for row in records)

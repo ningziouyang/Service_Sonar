@@ -5,6 +5,8 @@
 
 import sqlite3
 
+from migrate_database import ensure_feature_tables
+
 # 1. Importiere unsere gekapselten Agenten-Klassen
 from agent1_scraper_studis_online import Agent1Scraper
 from agent2_cleaner import Agent2Cleaner
@@ -53,6 +55,7 @@ def init_db():
             report_json TEXT
         )
     """)
+    ensure_feature_tables(conn)
     conn.commit()
     conn.close()
 
