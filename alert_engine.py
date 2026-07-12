@@ -1,5 +1,6 @@
 import argparse
 import json
+import os
 import sqlite3
 import sys
 from collections import Counter
@@ -13,6 +14,7 @@ except (AttributeError, ValueError):
 
 
 DB_FILE = "service_sonar.db"
+POST_TABLE_CANDIDATES = ("forum_posts", "hilferuf_posts", "gutefrage_posts")
 
 
 class AlertEngine:
@@ -23,8 +25,23 @@ class AlertEngine:
     counts, Agent-3 JSON and the latest trend snapshot instead of calling an LLM.
     """
 
-    def __init__(self, db_file=DB_FILE):
+    def __init__(
+        self,
+        db_file=DB_FILE,
+        human_review_threshold=None,
+        agent3_queue_threshold=None,
+    ):
         self.db_file = db_file
+        self.human_review_threshold = int(
+            human_review_threshold
+            if human_review_threshold is not None
+            else os.getenv("ALERT_HUMAN_REVIEW_THRESHOLD", "50")
+        )
+        self.agent3_queue_threshold = int(
+            agent3_queue_threshold
+            if agent3_queue_threshold is not None
+            else os.getenv("ALERT_AGENT3_QUEUE_THRESHOLD", "50")
+        )
 
     def _connect(self):
         return sqlite3.connect(self.db_file)
@@ -55,9 +72,21 @@ class AlertEngine:
         except json.JSONDecodeError:
             return {}
 
-    def _status_counts(self, cursor):
-        cursor.execute("SELECT status, COUNT(*) FROM forum_posts GROUP BY status")
-        return {int(status): count for status, count in cursor.fetchall()}
+    def _post_tables(self, cursor):
+        existing = {
+            row[0]
+            for row in cursor.execute(
+                "SELECT name FROM sqlite_master WHERE type = 'table'"
+            )
+        }
+        return [table for table in POST_TABLE_CANDIDATES if table in existing]
+
+    def _status_counts(self, cursor, post_tables):
+        counts = Counter()
+        for table in post_tables:
+            cursor.execute(f"SELECT status, COUNT(*) FROM {table} GROUP BY status")
+            counts.update({int(status): count for status, count in cursor.fetchall()})
+        return counts
 
     def _latest_trend_comparison(self, cursor):
         try:
@@ -78,24 +107,21 @@ class AlertEngine:
 
         return row[0], self._safe_json_loads(row[1])
 
-    def _cluster_urgency_counts(self, cursor):
-        cursor.execute(
-            """
-            SELECT analysis_json
-            FROM forum_posts
-            WHERE status = 2 AND analysis_json IS NOT NULL
-            """
-        )
-
+    def _cluster_urgency_counts(self, cursor, post_tables):
         cluster_counts = Counter()
         high_urgency_by_cluster = Counter()
-        for (raw_json,) in cursor.fetchall():
-            analysis = self._safe_json_loads(raw_json)
-            cluster = analysis.get("problem_cluster") or "Unbekannt"
-            urgency = analysis.get("urgency") or "Unbekannt"
-            cluster_counts[cluster] += 1
-            if urgency == "Hoch":
-                high_urgency_by_cluster[cluster] += 1
+        for table in post_tables:
+            cursor.execute(
+                f"SELECT analysis_json FROM {table} "
+                "WHERE status = 2 AND analysis_json IS NOT NULL"
+            )
+            for (raw_json,) in cursor.fetchall():
+                analysis = self._safe_json_loads(raw_json)
+                cluster = analysis.get("problem_cluster") or "Unbekannt"
+                urgency = analysis.get("urgency") or "Unbekannt"
+                cluster_counts[cluster] += 1
+                if urgency == "Hoch":
+                    high_urgency_by_cluster[cluster] += 1
 
         return cluster_counts, high_urgency_by_cluster
 
@@ -129,16 +155,19 @@ class AlertEngine:
         cursor = conn.cursor()
         self._init_table(cursor)
 
-        status_counts = self._status_counts(cursor)
+        post_tables = self._post_tables(cursor)
+        status_counts = self._status_counts(cursor, post_tables)
         trend_id, comparison = self._latest_trend_comparison(cursor)
-        cluster_counts, high_urgency_by_cluster = self._cluster_urgency_counts(cursor)
+        cluster_counts, high_urgency_by_cluster = self._cluster_urgency_counts(
+            cursor, post_tables
+        )
 
         alerts = []
         total_posts = sum(status_counts.values())
         human_review = status_counts.get(3, 0)
         cleaned_queue = status_counts.get(1, 0)
 
-        if human_review > 100:
+        if human_review >= self.human_review_threshold:
             self._add_alert(
                 alerts,
                 "human_review_backlog",
@@ -146,7 +175,7 @@ class AlertEngine:
                 "Human-Review-Backlog über Schwelle",
                 f"{human_review} Fälle warten auf Human Review.",
                 human_review,
-                100,
+                self.human_review_threshold,
             )
 
         if total_posts and human_review / total_posts >= 0.2:
@@ -160,7 +189,7 @@ class AlertEngine:
                 20,
             )
 
-        if cleaned_queue > 100:
+        if cleaned_queue >= self.agent3_queue_threshold:
             self._add_alert(
                 alerts,
                 "agent3_queue",
@@ -168,7 +197,7 @@ class AlertEngine:
                 "Agent-3-Warteschlange wächst",
                 f"{cleaned_queue} bereinigte Beiträge warten auf semantische Analyse.",
                 cleaned_queue,
-                100,
+                self.agent3_queue_threshold,
             )
 
         cluster_delta = comparison.get("cluster_delta", {}) if comparison else {}
@@ -252,6 +281,12 @@ if __name__ == "__main__":
         description="Evaluate proactive Service Sonar notification rules."
     )
     parser.add_argument("--db-file", default=DB_FILE, help="Path to SQLite database.")
+    parser.add_argument("--human-review-threshold", type=int, default=None)
+    parser.add_argument("--agent3-queue-threshold", type=int, default=None)
     args = parser.parse_args()
 
-    AlertEngine(db_file=args.db_file).evaluate()
+    AlertEngine(
+        db_file=args.db_file,
+        human_review_threshold=args.human_review_threshold,
+        agent3_queue_threshold=args.agent3_queue_threshold,
+    ).evaluate()

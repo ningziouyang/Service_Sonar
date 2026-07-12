@@ -1343,7 +1343,7 @@ def render_trend_panel(trend_data):
             st.json(comparison.get("stakeholder_delta", {}))
 
 
-def render_quality_panel(alerts, evaluation_report):
+def render_quality_panel(alerts, evaluation_report, alert_metrics=None):
     render_html(
         """
 <section class="section" id="evaluation">
@@ -1363,6 +1363,12 @@ def render_quality_panel(alerts, evaluation_report):
 
     with alert_col:
         st.markdown("**Aktive Alerts**")
+        alert_metrics = alert_metrics or {}
+        metric_cols = st.columns(3)
+        metric_cols[0].metric("Geprüfte Beiträge", alert_metrics.get("total", 0))
+        metric_cols[1].metric("Human Review", alert_metrics.get("human_review", 0))
+        metric_cols[2].metric("Agent-3 Queue", alert_metrics.get("agent3_queue", 0))
+        st.caption(f"Datenquellen geprüft: {alert_metrics.get('sources', 0)}")
         if not alerts:
             st.success("Keine aktiven proaktiven Alerts.")
         for alert in alerts:
@@ -1975,6 +1981,43 @@ def get_open_alerts(limit=8):
         return []
 
     return [dict(row) for row in rows]
+
+
+def get_alert_scope_metrics():
+    empty = {"total": 0, "human_review": 0, "agent3_queue": 0, "sources": 0}
+    if not DB_FILE.exists():
+        return empty
+
+    candidates = ("forum_posts", "hilferuf_posts", "gutefrage_posts")
+    totals = Counter()
+    try:
+        conn = sqlite3.connect(DB_FILE)
+        existing = {
+            row[0]
+            for row in conn.execute(
+                "SELECT name FROM sqlite_master WHERE type = 'table'"
+            )
+        }
+        tables = [table for table in candidates if table in existing]
+        for table in tables:
+            totals.update(
+                {
+                    int(status): count
+                    for status, count in conn.execute(
+                        f"SELECT status, COUNT(*) FROM {table} GROUP BY status"
+                    )
+                }
+            )
+        conn.close()
+    except sqlite3.Error:
+        return empty
+
+    return {
+        "total": sum(totals.values()),
+        "human_review": totals.get(3, 0),
+        "agent3_queue": totals.get(1, 0),
+        "sources": len(tables),
+    }
 
 
 def get_latest_evaluation_report():
@@ -3318,8 +3361,9 @@ def main():
     trend_data = get_latest_trend_snapshot()
     render_trend_panel(trend_data)
     alerts = get_open_alerts()
+    alert_metrics = get_alert_scope_metrics()
     evaluation_report = get_latest_evaluation_report()
-    render_quality_panel(alerts, evaluation_report)
+    render_quality_panel(alerts, evaluation_report, alert_metrics)
     render_problem_dashboard(groups, len(analyses))
     render_cluster_section(groups, len(analyses))
     render_stakeholders(stakeholder_counts, reports)
