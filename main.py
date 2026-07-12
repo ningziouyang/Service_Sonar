@@ -34,9 +34,16 @@ def init_db():
             raw_content TEXT,
             cleaned_content TEXT,
             analysis_json TEXT,
-            status INTEGER DEFAULT 0  
+            status INTEGER DEFAULT 0 , 
+            analysis_attempts INTEGER DEFAULT 0
         )
     """)
+
+    # Add analysis_attempts to older databases that were created before this column existed.
+    try:
+        cursor.execute("ALTER TABLE forum_posts ADD COLUMN analysis_attempts INTEGER DEFAULT 0")
+    except sqlite3.OperationalError:
+        pass  # Column already exists — nothing to do.
     
     # Tabelle für die Ergebnisse von Agent 4 (Für das Dashboard)
     cursor.execute("""
