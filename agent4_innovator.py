@@ -382,6 +382,20 @@ Diversity constraints:
             f"{json.dumps(evidence_bundle, ensure_ascii=False, indent=2)}"
         )
 
+        try:
+            from feedback_store import summarize_feedback_for_prompt
+
+            feedback_hint = summarize_feedback_for_prompt(self.db_file)
+        except Exception:
+            feedback_hint = ""
+
+        if feedback_hint:
+            user_prompt += (
+                "\n\nBisheriges Stakeholder-Feedback zu früheren Serviceideen. "
+                "Nutze es als sanften Hinweis, nicht als strikte Regel:\n"
+                f"{feedback_hint}"
+            )
+
         return [
             {"role": "system", "content": system_prompt.strip()},
             {"role": "user", "content": user_prompt},

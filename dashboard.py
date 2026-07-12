@@ -204,7 +204,7 @@ html{scroll-behavior:smooth;}
 [data-testid="stAppViewContainer"]{scroll-behavior:smooth!important;}
 [data-testid="stMain"]{scroll-behavior:smooth!important;}
 .main{scroll-behavior:smooth!important;}
-#pipeline,#dashboard,#cluster,#stakeholder,#innovation{scroll-margin-top:82px;}
+#pipeline,#trend-monitoring,#dashboard,#cluster,#stakeholder,#innovation{scroll-margin-top:82px;}
 
 :root {
   --p50:#EEEDFE; --p100:#CECBF6; --p200:#AFA9EC; --p600:#534AB7; --p800:#3C3489;
@@ -1250,6 +1250,85 @@ def render_pipeline_health(health):
 """
     )
 
+
+def render_trend_panel(trend_data):
+    render_html(
+        """
+<section class="section" id="trend-monitoring">
+  <div class="sec-wrap">
+    <div class="sec-label">Trend Monitoring</div>
+    <h2 class="sec-title">Was hat sich seit dem letzten Refresh verändert?</h2>
+    <p class="sec-body">
+      Trend-Snapshots vergleichen mehrere Refresh-Läufe und machen sichtbar,
+      ob neue Signale, Cluster oder Stakeholder-Schwerpunkte entstehen.
+    </p>
+  </div>
+</section>
+"""
+    )
+
+    if not trend_data:
+        st.info(
+            "Noch keine Trend-Snapshots vorhanden. "
+            "Führe `python trend_tracker.py` aus, um die erste Baseline zu speichern."
+        )
+        return
+
+    snapshot = trend_data.get("snapshot", {})
+    comparison = trend_data.get("comparison", {})
+    created_at = trend_data.get("created_at") or snapshot.get("created_at") or "N/A"
+
+    if not comparison.get("available"):
+        st.info(
+            "Der letzte Snapshot ist als Baseline gespeichert. "
+            "Ein Vergleich erscheint ab dem nächsten Refresh-Lauf."
+        )
+
+    metric_cols = st.columns(4)
+    metric_cols[0].metric(
+        "Snapshot",
+        created_at,
+    )
+    metric_cols[1].metric(
+        "Gesamtbeiträge",
+        snapshot.get("total_posts", 0),
+        comparison.get("total_posts_change", 0)
+        if comparison.get("available")
+        else None,
+    )
+    metric_cols[2].metric(
+        "Analysiert",
+        snapshot.get("analyzed_posts", 0),
+        comparison.get("analyzed_posts_change", 0)
+        if comparison.get("available")
+        else None,
+    )
+    metric_cols[3].metric(
+        "Human Review",
+        snapshot.get("human_review_posts", 0),
+        comparison.get("human_review_change", 0)
+        if comparison.get("available")
+        else None,
+    )
+
+    highlights = comparison.get("highlights", [])
+    if highlights:
+        st.markdown("**Auffälligkeiten:**")
+        for item in highlights:
+            st.write(f"- {item}")
+
+    with st.expander("Trend-Details anzeigen"):
+        detail_cols = st.columns(3)
+        with detail_cols[0]:
+            st.markdown("**Cluster-Veränderungen**")
+            st.json(comparison.get("cluster_delta", {}))
+        with detail_cols[1]:
+            st.markdown("**Dringlichkeits-Veränderungen**")
+            st.json(comparison.get("urgency_delta", {}))
+        with detail_cols[2]:
+            st.markdown("**Stakeholder-Veränderungen**")
+            st.json(comparison.get("stakeholder_delta", {}))
+
 def normalize_cluster(raw_cluster, cleaned_content="") -> str:
     raw = str(raw_cluster or "").strip()
     if raw in CLUSTER_META:
@@ -1546,6 +1625,81 @@ def show_service_innovation_dialog(
 """
     )
 
+    try:
+        from feedback_store import DECISIONS, get_feedback_map, make_key, set_feedback
+
+        feedback_key = make_key(opportunity)
+        current_feedback = get_feedback_map().get(feedback_key, {})
+
+        st.divider()
+        st.markdown("**Stakeholder-Entscheidung zu dieser Idee**")
+
+        default_decision = current_feedback.get("decision")
+        feedback_decision = st.segmented_control(
+            "Entscheidung",
+            options=DECISIONS,
+            default=default_decision if default_decision in DECISIONS else None,
+            key=f"decision_{feedback_key}",
+            label_visibility="collapsed",
+        )
+        feedback_note = st.text_input(
+            "Notiz",
+            value=current_feedback.get("note", ""),
+            key=f"note_{feedback_key}",
+            placeholder="Optionale Notiz...",
+            label_visibility="collapsed",
+        )
+
+        if st.button("Entscheidung speichern", key=f"save_{feedback_key}"):
+            if feedback_decision:
+                set_feedback(
+                    feedback_key,
+                    opportunity,
+                    feedback_decision,
+                    feedback_note or "",
+                )
+                st.success(f"Gespeichert: {feedback_decision}")
+            else:
+                st.warning("Bitte zuerst eine Entscheidung wählen.")
+
+        if current_feedback.get("updated_at"):
+            st.caption(
+                "Zuletzt: "
+                f"{current_feedback.get('decision')} · "
+                f"{current_feedback.get('updated_at')}"
+            )
+
+        if feedback_decision == "Andere Lösung nötig":
+            st.info(
+                "Der Bedarf bleibt bestehen. Service Sonar kann eine alternative "
+                "Idee für dasselbe Problem vorschlagen."
+            )
+
+            if st.button("↻ Neue Lösung vorschlagen", key=f"regen_{feedback_key}"):
+                try:
+                    with st.spinner("Alternative Serviceidee wird entwickelt..."):
+                        regen_prompt = (
+                            f"Die bisherige Idee '{opportunity}' für den Bedarf im "
+                            f"Cluster '{cluster}' wurde vom Stakeholder als unpassend "
+                            "markiert. Schlage einen anderen Lösungsansatz für "
+                            f"denselben Bedarf vor. Datengrundlage: {innovation_evidence}"
+                        )
+                        alternative = Agent4Innovator().generate_from_signal(regen_prompt)
+                    st.session_state[f"alt_{feedback_key}"] = alternative
+                except Exception as exc:
+                    st.error(f"Alternative konnte nicht generiert werden: {exc}")
+
+        alternative = st.session_state.get(f"alt_{feedback_key}")
+        if isinstance(alternative, dict):
+            st.markdown("**Alternativer Vorschlag von Agent 4:**")
+            st.markdown(
+                f"**{alternative.get('opportunity', 'Neue Serviceidee')}**"
+            )
+            st.write(alternative.get("solution", ""))
+
+    except Exception as exc:
+        st.warning(f"Stakeholder-Feedback konnte nicht geladen werden: {exc}")
+
 def set_signal_suggestion(text: str) -> None:
     st.session_state.signal_input = text
 
@@ -1656,6 +1810,56 @@ def load_data():
         return [], []
 
 
+def get_latest_trend_snapshot():
+    """
+    Load the latest trend snapshot from SQLite.
+
+    trend_tracker.py creates the table. Missing snapshots are normal on a
+    fresh demo, so the dashboard returns None instead of failing.
+    """
+    if not DB_FILE.exists():
+        return None
+
+    try:
+        conn = sqlite3.connect(DB_FILE)
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            SELECT created_at, snapshot_json, comparison_json
+            FROM trend_snapshots
+            ORDER BY id DESC
+            LIMIT 1
+            """
+        )
+        row = cursor.fetchone()
+        conn.close()
+    except sqlite3.OperationalError:
+        return None
+    except sqlite3.Error:
+        return None
+
+    if not row:
+        return None
+
+    created_at, snapshot_json, comparison_json = row
+
+    try:
+        snapshot = json.loads(snapshot_json or "{}")
+    except json.JSONDecodeError:
+        snapshot = {}
+
+    try:
+        comparison = json.loads(comparison_json or "{}")
+    except json.JSONDecodeError:
+        comparison = {}
+
+    return {
+        "created_at": created_at,
+        "snapshot": snapshot,
+        "comparison": comparison,
+    }
+
+
 def build_analytics(records):
     analyses = []
     for row in records:
@@ -1702,6 +1906,7 @@ def render_nav():
     </a>
     <div class="nav-links">
       <a href="#pipeline">Pipeline</a>
+      <a href="#trend-monitoring">Trends</a>
       <a href="#dashboard">Signale</a>
       <a href="#cluster">Clustering</a>
       <a href="#stakeholder">Stakeholder</a>
@@ -2952,6 +3157,8 @@ def main():
     render_pipeline(status_counts)
     health = get_pipeline_health(reports)
     render_pipeline_health(health)
+    trend_data = get_latest_trend_snapshot()
+    render_trend_panel(trend_data)
     render_problem_dashboard(groups, len(analyses))
     render_cluster_section(groups, len(analyses))
     render_stakeholders(stakeholder_counts, reports)
