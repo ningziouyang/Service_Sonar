@@ -17,6 +17,7 @@ mkdir -p logs
   # --scrape    = collect new forum posts
   # --innovate  = update Agent 4 service opportunities after analysis
   # --agent3-limit 50 = limit LLM processing per run to avoid API overload
+  # Trend snapshots, proactive alerts and evaluation reports run by default.
   python3 pipeline_refresh.py --scrape --innovate --agent3-limit 50 --agent3-sleep 1
 
   echo "============================================================"

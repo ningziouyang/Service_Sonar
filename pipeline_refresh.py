@@ -6,7 +6,10 @@ from agent1_scraper import Agent1Scraper
 from agent2_cleaner import Agent2Cleaner
 from agent3_analyzer import Agent3Analyzer
 from agent4_innovator import Agent4Innovator
-from main import init_db, human_intervention_interface
+from alert_engine import AlertEngine
+from evaluation_engine import EvaluationEngine
+from main import init_db
+from trend_tracker import TrendTracker
 
 
 def run_pipeline_refresh(
@@ -15,6 +18,9 @@ def run_pipeline_refresh(
     review: bool = False,
     analyze: bool = True,
     innovate: bool = False,
+    trend: bool = True,
+    alerts: bool = True,
+    evaluate: bool = True,
     agent3_limit: int | None = 20,
     agent3_sleep: float = 1.0,
 ):
@@ -52,8 +58,11 @@ def run_pipeline_refresh(
         print("\n[Refresh] Agent 2 übersprungen.")
 
     if review:
-        print("\n[Refresh] Human Review: Prüfe blockierte Fälle...")
-        human_intervention_interface()
+        print(
+            "\n[Refresh] Human Review wurde angefordert, ist aber in diesem "
+            "automatischen Refresh nicht interaktiv implementiert. "
+            "Status-3-Fälle bleiben für das Dashboard sichtbar."
+        )
     else:
         print("\n[Refresh] Human Review übersprungen, damit der Refresh automatisch laufen kann.")
 
@@ -75,6 +84,27 @@ def run_pipeline_refresh(
     else:
         print("\n[Refresh] Agent 4 übersprungen.")
 
+    if trend:
+        print("\n[Refresh] Trend Tracker: Speichere Snapshot...")
+        tracker = TrendTracker()
+        tracker.create_snapshot()
+    else:
+        print("\n[Refresh] Trend Tracker übersprungen.")
+
+    if alerts:
+        print("\n[Refresh] Alert Engine: Prüfe proaktive Benachrichtigungen...")
+        alert_engine = AlertEngine()
+        alert_engine.evaluate()
+    else:
+        print("\n[Refresh] Alert Engine übersprungen.")
+
+    if evaluate:
+        print("\n[Refresh] Evaluation Engine: Prüfe Cluster und Serviceideen...")
+        evaluation_engine = EvaluationEngine()
+        evaluation_engine.run()
+    else:
+        print("\n[Refresh] Evaluation Engine übersprungen.")
+
     finished_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
     print("\n============================================================")
@@ -89,6 +119,9 @@ def run_watch_mode(
     review: bool,
     analyze: bool,
     innovate: bool,
+    trend: bool,
+    alerts: bool,
+    evaluate: bool,
     agent3_limit: int | None,
     agent3_sleep: float,
 ):
@@ -112,6 +145,9 @@ def run_watch_mode(
                 review=review,
                 analyze=analyze,
                 innovate=innovate,
+                trend=trend,
+                alerts=alerts,
+                evaluate=evaluate,
                 agent3_limit=agent3_limit,
                 agent3_sleep=agent3_sleep,
             )
@@ -172,6 +208,24 @@ if __name__ == "__main__":
     )
 
     parser.add_argument(
+        "--no-trend",
+        action="store_true",
+        help="Skip Trend Tracker snapshot after the refresh."
+    )
+
+    parser.add_argument(
+        "--no-alerts",
+        action="store_true",
+        help="Skip proactive alert evaluation after the refresh."
+    )
+
+    parser.add_argument(
+        "--no-evaluation",
+        action="store_true",
+        help="Skip systematic evaluation of Agent 3/4 outputs."
+    )
+
+    parser.add_argument(
         "--agent3-limit",
         type=int,
         default=20,
@@ -198,6 +252,9 @@ if __name__ == "__main__":
 
     clean = not args.no_clean
     analyze = not args.no_analyze
+    trend = not args.no_trend
+    alerts = not args.no_alerts
+    evaluate = not args.no_evaluation
 
     if args.watch:
         run_watch_mode(
@@ -207,6 +264,9 @@ if __name__ == "__main__":
             review=args.review,
             analyze=analyze,
             innovate=args.innovate,
+            trend=trend,
+            alerts=alerts,
+            evaluate=evaluate,
             agent3_limit=args.agent3_limit,
             agent3_sleep=args.agent3_sleep,
         )
@@ -217,6 +277,9 @@ if __name__ == "__main__":
             review=args.review,
             analyze=analyze,
             innovate=args.innovate,
+            trend=trend,
+            alerts=alerts,
+            evaluate=evaluate,
             agent3_limit=args.agent3_limit,
             agent3_sleep=args.agent3_sleep,
         )

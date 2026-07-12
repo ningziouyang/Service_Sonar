@@ -1329,6 +1329,74 @@ def render_trend_panel(trend_data):
             st.markdown("**Stakeholder-Veränderungen**")
             st.json(comparison.get("stakeholder_delta", {}))
 
+
+def render_quality_panel(alerts, evaluation_report):
+    render_html(
+        """
+<section class="section" id="evaluation">
+  <div class="sec-wrap">
+    <div class="sec-label">Evaluation & Proaktive Benachrichtigungen</div>
+    <h2 class="sec-title">LLM-Ergebnisse systematisch prüfen</h2>
+    <p class="sec-body">
+      Service Sonar bewertet Cluster-Qualität, Serviceideen-Fit und operative
+      Warnsignale nach jedem Refresh regelbasiert und speichert die Ergebnisse in SQLite.
+    </p>
+  </div>
+</section>
+"""
+    )
+
+    alert_col, eval_col = st.columns([1, 1])
+
+    with alert_col:
+        st.markdown("**Aktive Alerts**")
+        if not alerts:
+            st.success("Keine aktiven proaktiven Alerts.")
+        for alert in alerts:
+            severity = alert.get("severity", "info")
+            message = f"**{alert.get('title', 'Alert')}**  \n{alert.get('message', '')}"
+            if severity == "critical":
+                st.error(message)
+            elif severity == "warning":
+                st.warning(message)
+            else:
+                st.info(message)
+
+    with eval_col:
+        st.markdown("**Letzte Evaluation**")
+        if not evaluation_report:
+            st.info(
+                "Noch kein Evaluation-Report vorhanden. "
+                "Führe `python evaluation_engine.py` aus."
+            )
+        else:
+            summary = evaluation_report.get("summary", {})
+            metric_cols = st.columns(3)
+            metric_cols[0].metric(
+                "Aktive Cluster",
+                evaluation_report.get("active_clusters", 0),
+            )
+            metric_cols[1].metric(
+                "Review-Cluster",
+                summary.get("clusters_needing_review", 0),
+            )
+            avg_fit = summary.get("average_service_idea_fit")
+            metric_cols[2].metric(
+                "Service-Fit",
+                "N/A" if avg_fit is None else f"{avg_fit}%",
+            )
+
+    if evaluation_report:
+        with st.expander("Evaluation-Details anzeigen"):
+            detail_cols = st.columns(2)
+            with detail_cols[0]:
+                st.markdown("**Cluster-Evaluation**")
+                st.json(evaluation_report.get("cluster_evaluations", []))
+            with detail_cols[1]:
+                st.markdown("**Serviceideen-Evaluation**")
+                st.json(evaluation_report.get("service_idea_evaluation", {}))
+
+
 def normalize_cluster(raw_cluster, cleaned_content="") -> str:
     raw = str(raw_cluster or "").strip()
     if raw in CLUSTER_META:
@@ -1858,6 +1926,74 @@ def get_latest_trend_snapshot():
         "snapshot": snapshot,
         "comparison": comparison,
     }
+
+
+def get_open_alerts(limit=8):
+    if not DB_FILE.exists():
+        return []
+
+    try:
+        conn = sqlite3.connect(DB_FILE)
+        conn.row_factory = sqlite3.Row
+        rows = conn.execute(
+            """
+            SELECT id, created_at, severity, alert_type, title, message,
+                   metric_value, threshold_value, evidence_json, status
+            FROM system_alerts
+            WHERE status = 'open'
+            ORDER BY
+                CASE severity
+                    WHEN 'critical' THEN 0
+                    WHEN 'warning' THEN 1
+                    ELSE 2
+                END,
+                created_at DESC
+            LIMIT ?
+            """,
+            (limit,),
+        ).fetchall()
+        conn.close()
+    except sqlite3.OperationalError:
+        return []
+    except sqlite3.Error:
+        return []
+
+    return [dict(row) for row in rows]
+
+
+def get_latest_evaluation_report():
+    if not DB_FILE.exists():
+        return None
+
+    try:
+        conn = sqlite3.connect(DB_FILE)
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            SELECT created_at, report_json
+            FROM evaluation_reports
+            ORDER BY id DESC
+            LIMIT 1
+            """
+        )
+        row = cursor.fetchone()
+        conn.close()
+    except sqlite3.OperationalError:
+        return None
+    except sqlite3.Error:
+        return None
+
+    if not row:
+        return None
+
+    created_at, report_json = row
+    try:
+        report = json.loads(report_json or "{}")
+    except json.JSONDecodeError:
+        report = {}
+
+    report["created_at_db"] = created_at
+    return report
 
 
 def build_analytics(records):
@@ -3159,6 +3295,9 @@ def main():
     render_pipeline_health(health)
     trend_data = get_latest_trend_snapshot()
     render_trend_panel(trend_data)
+    alerts = get_open_alerts()
+    evaluation_report = get_latest_evaluation_report()
+    render_quality_panel(alerts, evaluation_report)
     render_problem_dashboard(groups, len(analyses))
     render_cluster_section(groups, len(analyses))
     render_stakeholders(stakeholder_counts, reports)

@@ -15,6 +15,7 @@ REM Run scheduled pipeline refresh:
 REM --scrape    = collect new forum posts
 REM --innovate  = update Agent 4 service opportunities after analysis
 REM --agent3-limit 50 = limit LLM processing per run to avoid API overload
+REM Trend snapshots, proactive alerts and evaluation reports run by default.
 python pipeline_refresh.py --scrape --innovate --agent3-limit 50 --agent3-sleep 1 >> logs\daily_refresh.log 2>&1
 
 echo ============================================================ >> logs\daily_refresh.log

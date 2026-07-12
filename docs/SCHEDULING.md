@@ -10,6 +10,9 @@ Agent 1 scraper
 → Agent 2 cleaner
 → Agent 3 analyzer
 → Agent 4 innovator
+→ Trend Tracker
+→ Alert Engine
+→ Evaluation Engine
 → updated SQLite database
 → Streamlit dashboard reads the updated data
 ```
