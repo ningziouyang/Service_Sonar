@@ -28,9 +28,12 @@ class Agent2Cleaner:
     # das "Studium"-Forum von Hilferuf sind schon thematisch eng genug,
     # aber breite Hilferuf-Foren wie "Ich" oder "Finanzen" brauchen den
     # zusätzlichen Check, weil dort auch komplett studienfremde Themen landen.
+    # gutefrage_posts enthält teils die allgemeine Kategorie "Beruf Ausbildung"
+    # (Schulalltag, Ausbildung, Jobsuche etc. gemischt) -> ebenfalls Check nötig.
     SOURCE_TABLES = {
         "forum_posts": {"require_student_context": False},
         "hilferuf_posts": {"require_student_context": True},
+        "gutefrage_posts": {"require_student_context": True},
     }
 
     def __init__(self, db_file="service_sonar.db"):
@@ -131,7 +134,6 @@ class Agent2Cleaner:
         """
         irrelevant_keywords = [
             "verkaufe",
-            "zu verkaufen",
             "nachmieter gesucht",
             "suche nachmieter",
             "wg-zimmer abzugeben",
@@ -140,12 +142,16 @@ class Agent2Cleaner:
             "skripte verkaufen",
             "umfrage",
             "teilnehmer gesucht",
-            "masterarbeit",
-            "bachelorarbeit",
             "studie zu",
             "ki-gestützter chatbot",
             "chatbot auf unserer seite",
         ]
+
+        # "zu verkaufen" ist als Vollsatz-Suche zu riskant: trifft auch normale
+        # Sätze wie "Produkte besser zu verkaufen" (Beruf/Marketing-Kontext),
+        # nicht nur Kleinanzeigen ("Zimmer zu verkaufen"). Echte Anzeigen nennen
+        # den Artikel fast immer gleich zu Beginn -> nur im Titel/Anfang prüfen.
+        irrelevant_title_keywords = ["zu verkaufen"]
 
         irrelevant_title_patterns = [
             "sekunden her",
@@ -161,10 +167,34 @@ class Agent2Cleaner:
         text_lower = text.lower()
         first_part = text_lower[:120]
 
+        # "masterarbeit"/"bachelorarbeit" NICHT pauschal als Spam werten:
+        # Das trifft sonst auch echte Notlagen-Posts ("Ich habe Angst, meine
+        # Bachelorarbeit nicht zu schaffen"), nicht nur Umfrage-Spam
+        # ("Ich schreibe meine Bachelorarbeit, bitte macht meine Umfrage").
+        # Nur werfen, wenn zusätzlich ein Umfrage-/Rekrutierungs-Muster da ist.
+        umfrage_muster = ["umfrage", "teilnehmer gesucht", "studie zu", "befragung"]
+        abschlussarbeit_erwaehnt = any(
+            k in text_lower for k in ["masterarbeit", "bachelorarbeit"]
+        )
+        if abschlussarbeit_erwaehnt and any(m in text_lower for m in umfrage_muster):
+            return True
+
         if any(pattern in first_part for pattern in irrelevant_title_patterns):
             return True
 
-        return any(keyword in text_lower for keyword in irrelevant_keywords)
+        if any(
+            re.search(r"\b" + re.escape(kw) + r"\b", first_part)
+            for kw in irrelevant_title_keywords
+        ):
+            return True
+
+        # Wortgrenzen-Suche statt naiver Teilstring-Suche: verhindert False
+        # Positives wie "werbung" als Treffer innerhalb von "Bewerbung"
+        # (Uni-Bewerbung != Werbung/Spam).
+        return any(
+            re.search(r"\b" + re.escape(keyword) + r"\b", text_lower)
+            for keyword in irrelevant_keywords
+        )
 
     def _has_student_context(self, text: str) -> bool:
         """
@@ -180,6 +210,11 @@ class Agent2Cleaner:
             "seminar", "vorlesung", "bafög", "immatrikul",
             "wg-zimmer", "campus", "dozent", "kommiliton",
             "abschlussarbeit", "hausarbeit",
+            # ergänzt nach Stichprobenprüfung (echte Studium-Posts, die durchgerutscht sind):
+            "studiengang", "studienplatz", "studienfach", "studienwahl",
+            "bewerbung", "zulassung", "einschreibung", "wintersemester",
+            "sommersemester", "nc ", "abitur", "examen", "fachschaft",
+            "erstsemester", "hochschulstart",
         ]
         text_lower = text.lower()
         return any(keyword in text_lower for keyword in student_keywords)
@@ -284,4 +319,4 @@ class Agent2Cleaner:
 
 if __name__ == "__main__":
     cleaner = Agent2Cleaner()
-    cleaner.run(table_name="hilferuf_posts", require_student_context=True)
+    cleaner.run_all()
