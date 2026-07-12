@@ -20,6 +20,7 @@ st.set_page_config(
 )
 
 DB_FILE = Path(__file__).with_name("service_sonar.db")
+POST_TABLE_CANDIDATES = ("forum_posts", "hilferuf_posts", "gutefrage_posts")
 
 
 def ensure_dashboard_schema() -> list[str]:
@@ -1871,19 +1872,28 @@ def load_data():
     try:
         conn = sqlite3.connect(DB_FILE)
         conn.row_factory = sqlite3.Row
+        existing = {
+            row[0]
+            for row in conn.execute(
+                "SELECT name FROM sqlite_master WHERE type = 'table'"
+            )
+        }
+        post_tables = [
+            table for table in POST_TABLE_CANDIDATES if table in existing
+        ]
+        post_queries = [
+            (
+                "SELECT id, url, raw_content, cleaned_content, analysis_json, "
+                f"status, '{table}' AS source_table FROM {table}"
+            )
+            for table in post_tables
+        ]
         records = [
             dict(row)
             for row in conn.execute(
-                """
-                SELECT id, url, raw_content, cleaned_content, analysis_json, status, 'forum_posts' AS source_table
-                FROM forum_posts
-                UNION ALL
-                SELECT id, url, raw_content, cleaned_content, analysis_json, status, 'hilferuf_posts' AS source_table
-                FROM hilferuf_posts
-                ORDER BY id DESC
-                """
+                " UNION ALL ".join(post_queries) + " ORDER BY id DESC"
             ).fetchall()
-        ]
+        ] if post_queries else []
         reports = [
             dict(row)
             for row in conn.execute(
@@ -1988,7 +1998,6 @@ def get_alert_scope_metrics():
     if not DB_FILE.exists():
         return empty
 
-    candidates = ("forum_posts", "hilferuf_posts", "gutefrage_posts")
     totals = Counter()
     try:
         conn = sqlite3.connect(DB_FILE)
@@ -1998,7 +2007,9 @@ def get_alert_scope_metrics():
                 "SELECT name FROM sqlite_master WHERE type = 'table'"
             )
         }
-        tables = [table for table in candidates if table in existing]
+        tables = [
+            table for table in POST_TABLE_CANDIDATES if table in existing
+        ]
         for table in tables:
             totals.update(
                 {
