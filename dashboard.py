@@ -2137,7 +2137,7 @@ def render_hero(total_records, analyzed_count, cluster_count, urgent_count):
       <a class="btn-s" href="#pipeline"><i class="ti ti-route"></i> Pipeline ansehen</a>
     </div>
     <div class="hero-stats">
-      <div><div class="stat-n">{total_records}</div><div class="stat-l">Quellen in SQLite</div></div>
+      <div><div class="stat-n">{total_records}</div><div class="stat-l">Beiträge in SQLite</div></div>
       <div><div class="stat-n">{analyzed_count}</div><div class="stat-l">LLM-analysierte Texte</div></div>
       <div><div class="stat-n">{cluster_count}</div><div class="stat-l">Aktive Problemcluster</div></div>
       <div><div class="stat-n">{urgent_count}</div><div class="stat-l">High-urgency Signale</div></div>
