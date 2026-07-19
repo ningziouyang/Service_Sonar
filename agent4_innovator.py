@@ -126,10 +126,37 @@ class Agent4Innovator:
     def _load_analyzed_records(self, cursor):
         cursor.execute(
             """
-            SELECT id, cleaned_content, analysis_json
-            FROM forum_posts
-            WHERE status = 2 AND analysis_json IS NOT NULL
-            ORDER BY id ASC
+            SELECT record_id, cleaned_content, analysis_json
+            FROM (
+                SELECT 'forum_posts:' || id AS record_id,
+                       cleaned_content,
+                       analysis_json,
+                       1 AS source_order,
+                       id AS source_id
+                FROM forum_posts
+                WHERE status = 2 AND analysis_json IS NOT NULL
+
+                UNION ALL
+
+                SELECT 'hilferuf_posts:' || id AS record_id,
+                       cleaned_content,
+                       analysis_json,
+                       2 AS source_order,
+                       id AS source_id
+                FROM hilferuf_posts
+                WHERE status = 2 AND analysis_json IS NOT NULL
+
+                UNION ALL
+
+                SELECT 'gutefrage_posts:' || id AS record_id,
+                       cleaned_content,
+                       analysis_json,
+                       3 AS source_order,
+                       id AS source_id
+                FROM gutefrage_posts
+                WHERE status = 2 AND analysis_json IS NOT NULL
+            )
+            ORDER BY source_order, source_id
             """
         )
         return cursor.fetchall()
