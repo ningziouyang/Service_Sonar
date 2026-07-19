@@ -1720,7 +1720,7 @@ def show_service_innovation_dialog(
         current_feedback = get_feedback_map().get(feedback_key, {})
 
         st.divider()
-        st.markdown("**Stakeholder-Entscheidung zu dieser Idee**")
+        st.markdown("**Rückmeldung zu dieser Idee**")
 
         default_decision = current_feedback.get("decision")
         feedback_decision = st.segmented_control(
@@ -1738,7 +1738,7 @@ def show_service_innovation_dialog(
             label_visibility="collapsed",
         )
 
-        if st.button("Entscheidung speichern", key=f"save_{feedback_key}"):
+        if st.button("Rückmeldung speichern", key=f"save_{feedback_key}"):
             if feedback_decision:
                 set_feedback(
                     feedback_key,
